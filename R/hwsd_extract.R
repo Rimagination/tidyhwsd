@@ -37,7 +37,7 @@
 #' \dontrun{
 #' # Single point query
 #' pt <- hwsd_extract(
-#'   coords = c(120, 30),
+#'   coords = c(110, 40),
 #'   param = c("SAND", "PH_WATER"),
 #'   layer = "D1",
 #'   ws_path = "~/data/HWSD2"

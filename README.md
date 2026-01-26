@@ -3,10 +3,11 @@
 
 Tidyverse-friendly access to the Harmonized World Soil Database (HWSD) v2.0.
 
-## Installation
+## Installation (GitHub)
 
 ```r
-remotes::install_local("D:/VSCODEPROJECTS/hwsd/tidyhwsd", upgrade = "never")
+# install.packages("remotes")
+remotes::install_github("Rimagination/tidyhwsd")
 ```
 
 ## Workflow

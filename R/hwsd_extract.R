@@ -260,6 +260,8 @@ hwsd_extract <- function(
           col <- vals[[par]]
           if (is.numeric(col)) {
             val <- col[1]
+            # HWSD v2.0 uses negative values for NoData (e.g. -9)
+            if (!is.na(val) && val < 0) val <- NA_real_
           } else {
             val <- as.character(col[1])
           }
@@ -293,6 +295,8 @@ hwsd_extract <- function(
     if (!is.numeric(column)) {
       cli::cli_abort("Parameter {.val {param[j]}} is not numeric and cannot be rasterized.")
     }
+    # HWSD v2.0 uses negative values for NoData (e.g. -9)
+    column[column < 0] <- NA
     lookup <- stats::setNames(column, hwsd2$HWSD2_SMU_ID)
     param_mat[, j] <- lookup[as.character(ids_vec)]
   }

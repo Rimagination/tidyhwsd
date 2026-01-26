@@ -15,7 +15,8 @@
 #' @return tibble for point queries; `terra::SpatRaster` (or file path if `internal=FALSE`) for bbox queries.
 #' @export
 hwsd_extract <- function(
-  location,
+  coords = NULL,
+  bbox = NULL,
   param = "ALL",
   layer = "D1",
   path = tempdir(),
@@ -25,16 +26,52 @@ hwsd_extract <- function(
   cores = 1,
   verbose = FALSE
 ) {
-  # handle sf bbox
-  if (inherits(location, "bbox")) {
-    location <- unname(location[c("xmin", "ymin", "xmax", "ymax")])
+  # handle input modes
+  if (!is.null(coords) && !is.null(bbox)) {
+    cli::cli_abort("Provide either `coords` or `bbox`, not both.")
+  }
+  if (is.null(coords) && is.null(bbox)) {
+    cli::cli_abort("Provide `coords = c(lon, lat)` or `bbox = c(lon_min, lat_min, lon_max, lat_max)`.")
   }
 
-  if (!(length(location) %in% c(2, 4))) {
-    cli::cli_abort("location must be a point (lon, lat) or bbox (lon_min, lat_min, lon_max, lat_max).")
-  }
+  if (!is.null(coords)) {
 
-  location <- as.numeric(location)
+    # accept numeric vector (single point), matrix, or data.frame
+    coords_df <- NULL
+    if (is.numeric(coords)) {
+      if (length(coords) != 2) {
+        cli::cli_abort("`coords` numeric input must be length 2: c(lon, lat). For multiple points use a matrix or data.frame with lon/lat columns.")
+      }
+      coords_df <- data.frame(
+        lon = coords[1],
+        lat = coords[2]
+      )
+    } else if (is.matrix(coords)) {
+      if (ncol(coords) != 2) {
+        cli::cli_abort("`coords` matrix must have 2 columns: lon, lat.")
+      }
+      coords_df <- data.frame(lon = coords[, 1], lat = coords[, 2])
+    } else if (is.data.frame(coords)) {
+      if (!all(c("lon", "lat") %in% names(coords))) {
+        cli::cli_abort("`coords` data.frame must have columns `lon` and `lat`.")
+      }
+      coords_df <- data.frame(lon = coords$lon, lat = coords$lat)
+    } else {
+      cli::cli_abort("`coords` must be numeric (length 2), matrix (2 cols), or data.frame with lon/lat.")
+    }
+
+    mode <- "point"
+    location <- as.numeric(unlist(coords_df[1, ]))
+  } else {
+    if (inherits(bbox, "bbox")) {
+      bbox <- unname(bbox[c("xmin", "ymin", "xmax", "ymax")])
+    }
+    location <- as.numeric(bbox)
+    if (length(location) != 4) {
+      cli::cli_abort("`bbox` must be length 4: c(lon_min, lat_min, lon_max, lat_max).")
+    }
+    mode <- "bbox"
+  }
 
   # ensure grid exists
   grid_bil <- file.path(ws_path, "HWSD2.bil")
@@ -62,7 +99,7 @@ hwsd_extract <- function(
     param <- available[!available %in% c("HWSD2_SMU_ID", "LAYER")]
   }
 
-  if (length(location) == 4 && request_all) {
+  if (mode == "bbox" && request_all) {
     param <- param[
       vapply(
         param,
@@ -81,7 +118,7 @@ hwsd_extract <- function(
   }
 
   # tiling for large bbox
-  if (length(location) == 4 &&
+  if (mode == "bbox" &&
       is.finite(tiles_deg) &&
       tiles_deg > 0 &&
       (location[3] - location[1] > tiles_deg ||
@@ -135,33 +172,45 @@ hwsd_extract <- function(
     }
   }
 
-  # point workflow
-  if (length(location) == 2) {
+  # point workflow (single or multiple)
+  if (mode == "point") {
+
+    # reuse coords_df constructed above
+    if (!exists("coords_df")) {
+      coords_df <- data.frame(lon = location[1], lat = location[2])
+    }
+
     p <- sf::st_as_sf(
-      data.frame(lon = location[1], lat = location[2]),
+      coords_df,
       coords = c("lon", "lat"),
       crs = 4326
     )
 
     pixel_id <- terra::extract(ids_rast, p)
-    smu_id <- pixel_id[[1]]
-    if (length(smu_id) == 0 || is.na(smu_id)) {
-      cli::cli_abort("Location falls outside the HWSD v2.0 grid.")
-    }
+    smu_ids <- pixel_id[[1]]
 
-    values <- hwsd2 |>
-      dplyr::filter(HWSD2_SMU_ID == smu_id)
+    results <- lapply(seq_len(nrow(coords_df)), function(i) {
+      smu_id <- smu_ids[i]
+      vals <- if (!is.na(smu_id)) {
+        hwsd2 |>
+          dplyr::filter(HWSD2_SMU_ID == smu_id)
+      } else {
+        NULL
+      }
 
-    rows <- lapply(param, function(par) {
-      tibble::tibble(
-        longitude = location[1],
-        latitude = location[2],
-        parameter = par,
-        value = values[[par]]
-      )
+      rows <- lapply(param, function(par) {
+        val <- if (!is.null(vals) && nrow(vals) > 0) vals[[par]][1] else NA_real_
+        tibble::tibble(
+          longitude = coords_df$lon[i],
+          latitude = coords_df$lat[i],
+          parameter = par,
+          value = val
+        )
+      })
+      dplyr::bind_rows(rows)
     })
 
-    return(dplyr::bind_rows(rows))
+    return(dplyr::bind_rows(results))
   }
 
   # bbox workflow

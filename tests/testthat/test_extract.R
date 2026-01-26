@@ -11,12 +11,12 @@ test_that("point extract works with tiny mock grid", {
                      overwrite = TRUE)
 
   num_cols <- names(tidyhwsd::hwsd2)[vapply(tidyhwsd::hwsd2, is.numeric, logical(1))]
-  res <- hwsd_extract(
-    location = c(0.5, 0.5),
-    param = num_cols[1],
-    layer = tidyhwsd::hwsd2$LAYER[1],
-    ws_path = tmp
-  )
+res <- hwsd_extract(
+  coords = c(0.5, 0.5),
+  param = num_cols[1],
+  layer = tidyhwsd::hwsd2$LAYER[1],
+  ws_path = tmp
+)
 
   expect_s3_class(res, "tbl_df")
   expect_equal(nrow(res), 1)
@@ -35,12 +35,12 @@ test_that("bbox extract returns SpatRaster", {
 
   num_cols <- names(tidyhwsd::hwsd2)[vapply(tidyhwsd::hwsd2, is.numeric, logical(1))]
 
-  res <- hwsd_extract(
-    location = c(0, 0, 1, 1),
-    param = num_cols[1],
-    layer = tidyhwsd::hwsd2$LAYER[1],
-    ws_path = tmp
-  )
+res <- hwsd_extract(
+  bbox = c(0, 0, 1, 1),
+  param = num_cols[1],
+  layer = tidyhwsd::hwsd2$LAYER[1],
+  ws_path = tmp
+)
 
   expect_s4_class(res, "SpatRaster")
 })

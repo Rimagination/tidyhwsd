@@ -37,8 +37,20 @@ You can set `WS_PATH` in `~/.Renviron` to make the path persistent between sessi
 
 ```{r}
 pt <- hwsd_extract(
-  location = c(120, 30),
+  coords = c(120, 30),  # or stacked c(lon1, lat1, lon2, lat2, ...)
   param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "D:/data/HWSD2"
+)
+
+# multiple points via data frame
+sites <- data.frame(
+  lon = c(120, 121.5),
+  lat = c(30, 31.2)
+)
+pt_multi <- hwsd_extract(
+  coords = sites,
+  param = "SAND",
   layer = "D1",
   ws_path = "D:/data/HWSD2"
 )
@@ -51,7 +63,7 @@ For large areas you can tile automatically:
 
 ```{r}
 sand_cn <- hwsd_extract(
-  location = c(70, 18, 140, 54),
+  bbox = c(70, 18, 140, 54),
   param = "SAND",
   layer = "D1",
   ws_path = "D:/data/HWSD2",

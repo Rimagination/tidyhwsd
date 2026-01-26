@@ -3,12 +3,19 @@
 \alias{hwsd_extract}
 \title{Extract HWSD v2.0 attributes (point or bbox)}
 \usage{
-hwsd_extract(location, param = "ALL", layer = "D1", path = tempdir(),
-  ws_path = file.path(tempdir(), "ws_db"), internal = TRUE,
+hwsd_extract(coords = NULL, bbox = NULL, param = "ALL", layer = "D1",
+  path = tempdir(), ws_path = file.path(tempdir(), "ws_db"), internal = TRUE,
   tiles_deg = Inf, cores = 1, verbose = FALSE)
 }
 \arguments{
-\item{location}{Point c(lon, lat) or bbox c(lon_min, lat_min, lon_max, lat_max); \code{sf} bbox is also accepted.}
+\item{coords}{Point input for extraction. Can be:
+\itemize{
+  \item Numeric vector c(lon, lat) for a single point;
+  \item A matrix with 2 columns (lon, lat) for multiple points;
+  \item A data.frame/tibble with columns lon and lat for multiple points.
+}}
+
+\item{bbox}{Numeric vector c(lon_min, lat_min, lon_max, lat_max) or an \code{sf} bbox for a bounding box. Provide either \code{point} or \code{bbox}, not both.}
 \item{param}{Character vector of property names; \code{"ALL"} selects all available attributes (numeric-only for bbox).}
 \item{layer}{Soil layer code (\code{"D1"}--\code{"D7"}).}
 \item{path}{Output path when writing raster (used if \code{internal = FALSE}).}
@@ -28,15 +35,27 @@ Extract HWSD v2.0 attributes for points or bounding boxes using the downloaded i
 \dontrun{
 # point query (tibble)
 hwsd_extract(
-  location = c(120, 30),
+  coords = c(120, 30),
   param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "D:/data/HWSD2"
+)
+
+# multiple points (stacked vector)
+pts <- data.frame(
+  lon = c(120, 121.5),
+  lat = c(30, 31.2)
+)
+hwsd_extract(
+  coords = pts,
+  param = "SAND",
   layer = "D1",
   ws_path = "D:/data/HWSD2"
 )
 
 # bbox query (SpatRaster) with tiling for large areas
 hwsd_extract(
-  location = c(70, 18, 140, 54),
+  bbox = c(70, 18, 140, 54),
   param = "SAND",
   layer = "D1",
   ws_path = "D:/data/HWSD2",

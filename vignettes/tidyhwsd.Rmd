@@ -27,10 +27,15 @@ library(tidyhwsd)
 The HWSD index grid (HWSD2.bil) is not shipped with the package. Download it once to a writable directory:
 
 ```{r}
-hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
+# Replace with your preferred path
+hwsd_download(ws_path = "~/data/HWSD2", verbose = TRUE)
 ```
 
-You can set `WS_PATH` in `~/.Renviron` to make the path persistent between sessions.
+You can set `WS_PATH` in `~/.Renviron` to make the path persistent between sessions:
+
+```
+WS_PATH=~/data/HWSD2
+```
 
 ## Point queries (tibble output)
 
@@ -39,7 +44,7 @@ pt <- hwsd_extract(
   coords = c(120, 30),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
-  ws_path = "D:/data/HWSD2"
+  ws_path = "~/data/HWSD2"
 )
 ```
 
@@ -54,7 +59,7 @@ pt_multi <- hwsd_extract(
   coords = sites,
   param = "SAND",
   layer = "D1",
-  ws_path = "D:/data/HWSD2"
+  ws_path = "~/data/HWSD2"
 )
 pt_multi
 ```
@@ -68,7 +73,7 @@ sand_cn <- hwsd_extract(
   bbox = c(70, 18, 140, 54),
   param = "SAND",
   layer = "D1",
-  ws_path = "D:/data/HWSD2",
+  ws_path = "~/data/HWSD2",
   tiles_deg = 5,
   cores = 4
 )
@@ -81,7 +86,8 @@ This section uses ggplot2 and tidyterra.
 ```{r}
 library(ggplot2)
 library(tidyterra)
-ggplot() + tidyterra::geom_spatraster(data = sand_cn)
+ggplot() +
+  tidyterra::geom_spatraster(data = sand_cn)
 ```
 
 ## Discover available properties
@@ -90,3 +96,4 @@ ggplot() + tidyterra::geom_spatraster(data = sand_cn)
 hwsd_props()
 head(names(hwsd2))
 ```
+

@@ -13,7 +13,9 @@ remotes::install_github("Rimagination/tidyhwsd")
 1) Download the HWSD index grid once. The directory is created if needed.
 ```r
 library(tidyhwsd)
-hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
+
+# Replace with your preferred path, or set WS_PATH in ~/.Renviron
+hwsd_download(ws_path = "~/data/HWSD2", verbose = TRUE)
 ```
 
 2) Point query. Returns a tibble.
@@ -22,7 +24,7 @@ pt <- hwsd_extract(
   coords = c(120, 30),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
-  ws_path = "D:/data/HWSD2"
+  ws_path = "~/data/HWSD2"
 )
 ```
 
@@ -37,7 +39,7 @@ pt_multi <- hwsd_extract(
   coords = sites,
   param = "SAND",
   layer = "D1",
-  ws_path = "D:/data/HWSD2"
+  ws_path = "~/data/HWSD2"
 )
 ```
 
@@ -47,7 +49,7 @@ sand <- hwsd_extract(
   bbox = c(70, 18, 140, 54),
   param = "SAND",
   layer = "D1",
-  ws_path = "D:/data/HWSD2",
+  ws_path = "~/data/HWSD2",
   tiles_deg = 5,
   cores = 4,
   internal = TRUE
@@ -61,7 +63,18 @@ hwsd_props()
 head(names(hwsd2))
 ```
 
-### Plotting
+## Environment Variable
+
+To avoid specifying `ws_path` in every call, add the following to your `~/.Renviron` file:
+
+```
+WS_PATH=~/data/HWSD2
+```
+
+Then restart R. The package will automatically use this path.
+
+## Plotting
+
 For ggplot2 workflows, install tidyterra and use it to draw SpatRaster objects:
 ```r
 install.packages("tidyterra")
@@ -69,3 +82,4 @@ library(ggplot2)
 library(tidyterra)
 ggplot() + tidyterra::geom_spatraster(data = sand)
 ```
+

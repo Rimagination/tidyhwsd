@@ -1,18 +1,68 @@
 #' Extract HWSD v2.0 attributes (point or bbox)
 #'
-#' @param location A point c(lon, lat) or bbox c(lon_min, lat_min, lon_max, lat_max);
-#'   `sf` bbox objects are also accepted.
-#' @param param Character vector of property names; `"ALL"` selects all available
-#'   attributes (numeric-only for bbox).
-#' @param layer Soil layer code ("D1"–"D7").
+#' Extract soil properties from the HWSD v2.0 database for point locations or
+#' bounding box regions.
+#'
+#' @param coords Point coordinates. Accepts one of the following:
+#'   \itemize{
+#'     \item Numeric vector `c(lon, lat)` for a single point
+#'     \item Matrix with 2 columns (lon, lat) for multiple points
+#'     \item Data frame with `lon` and `lat` columns
+#'   }
+#' @param bbox Bounding box as `c(lon_min, lat_min, lon_max, lat_max)`.
+#'   Objects of class `bbox` (e.g., from `sf::st_bbox()`) are also accepted.
+#'   Provide either `coords` or `bbox`, not both.
+#' @param param Character vector of property names (e.g., `"SAND"`, `"PH_WATER"`).
+#'   Use `"ALL"` to select all available attributes (numeric-only for bbox queries).
+#'   See `hwsd_props()` for available properties.
+#' @param layer Soil layer code, one of `"D1"`, `"D2"`, `"D3"`, `"D4"`, `"D5"`,
+#'   `"D6"`, or `"D7"` (from top to bottom).
 #' @param path Output path when writing raster (used if `internal = FALSE`).
-#' @param ws_path Path to HWSD index grid; will be downloaded if missing.
+#' @param ws_path Path to the HWSD v2.0 index grid directory. If the grid is
+#'   missing, it will be downloaded automatically. You can set the `WS_PATH`
+#'   environment variable in `~/.Renviron` for persistence.
 #' @param internal If `TRUE`, return in-memory raster; if `FALSE`, write to `path`.
-#' @param tiles_deg Optional tiling size (degrees) for large bboxes; when finite and
-#'   smaller than extent, tiles are processed and mosaicked.
-#' @param cores Number of cores for tiling (uses `parallel::mclapply` on non-Windows).
-#' @param verbose Show progress messages.
-#' @return tibble for point queries; `terra::SpatRaster` (or file path if `internal=FALSE`) for bbox queries.
+#' @param tiles_deg Optional tiling size (degrees) for large bboxes. When finite
+#'   and smaller than extent, tiles are processed and mosaicked for better
+#'   performance.
+#' @param cores Number of cores for parallel tiling (uses `parallel::mclapply`
+#'   on non-Windows systems).
+#' @param verbose If `TRUE`, show progress messages.
+#'
+#' @return For point queries: a tibble with columns `longitude`, `latitude`,
+#'   `parameter`, and `value`. For bbox queries: a `terra::SpatRaster`
+#'   (or file path if `internal = FALSE`).
+#'
+#' @examples
+#' \dontrun{
+#' # Single point query
+#' pt <- hwsd_extract(
+#'   coords = c(120, 30),
+#'   param = c("SAND", "PH_WATER"),
+#'   layer = "D1",
+#'   ws_path = "~/data/HWSD2"
+#' )
+#'
+#' # Multiple points using a data frame
+#' sites <- data.frame(lon = c(120, 121.5), lat = c(30, 31.2))
+#' pts <- hwsd_extract(
+#'   coords = sites,
+#'   param = "SAND",
+#'   layer = "D1",
+#'   ws_path = "~/data/HWSD2"
+#' )
+#'
+#' # Bounding box query with tiling
+#' sand <- hwsd_extract(
+#'   bbox = c(70, 18, 140, 54),
+#'   param = "SAND",
+#'   layer = "D1",
+#'   ws_path = "~/data/HWSD2",
+#'   tiles_deg = 5,
+#'   cores = 4
+#' )
+#' }
+#'
 #' @export
 hwsd_extract <- function(
   coords = NULL,
@@ -35,7 +85,6 @@ hwsd_extract <- function(
   }
 
   if (!is.null(coords)) {
-
     # accept numeric vector (single point), matrix, or data.frame
     coords_df <- NULL
     if (is.numeric(coords)) {
@@ -84,6 +133,9 @@ hwsd_extract <- function(
     grid_file <- grid_bil
   }
   ids_rast <- terra::rast(grid_file)
+  if (is.null(names(ids_rast)) || any(names(ids_rast) == "")) {
+    names(ids_rast) <- "HWSD2"
+  }
 
   # load and cache attribute table
   if (is.null(.tidyhwsd_cache$hwsd2)) {
@@ -119,11 +171,10 @@ hwsd_extract <- function(
 
   # tiling for large bbox
   if (mode == "bbox" &&
-      is.finite(tiles_deg) &&
-      tiles_deg > 0 &&
-      (location[3] - location[1] > tiles_deg ||
-         location[4] - location[2] > tiles_deg)) {
-
+    is.finite(tiles_deg) &&
+    tiles_deg > 0 &&
+    (location[3] - location[1] > tiles_deg ||
+      location[4] - location[2] > tiles_deg)) {
     xbreaks <- seq(location[1], location[3], by = tiles_deg)
     ybreaks <- seq(location[2], location[4], by = tiles_deg)
     if (tail(xbreaks, 1) < location[3]) xbreaks <- c(xbreaks, location[3])
@@ -174,20 +225,25 @@ hwsd_extract <- function(
 
   # point workflow (single or multiple)
   if (mode == "point") {
-
     # reuse coords_df constructed above
     if (!exists("coords_df")) {
       coords_df <- data.frame(lon = location[1], lat = location[2])
     }
 
-    p <- sf::st_as_sf(
-      coords_df,
-      coords = c("lon", "lat"),
-      crs = 4326
+    coords_mat <- cbind(coords_df$lon, coords_df$lat)
+    pixel_vals <- tryCatch(
+      terra::extract(ids_rast, coords_mat, ID = FALSE),
+      error = function(e) terra::extract(ids_rast, coords_mat)
     )
-
-    pixel_id <- terra::extract(ids_rast, p)
-    smu_ids <- pixel_id[[1]]
+    if (is.data.frame(pixel_vals) || is.matrix(pixel_vals)) {
+      if (ncol(pixel_vals) >= 2) {
+        smu_ids <- pixel_vals[, 2]
+      } else {
+        smu_ids <- pixel_vals[, 1]
+      }
+    } else {
+      smu_ids <- as.vector(pixel_vals)
+    }
 
     results <- lapply(seq_len(nrow(coords_df)), function(i) {
       smu_id <- smu_ids[i]
@@ -199,7 +255,15 @@ hwsd_extract <- function(
       }
 
       rows <- lapply(param, function(par) {
-        val <- if (!is.null(vals) && nrow(vals) > 0) vals[[par]][1] else NA_real_
+        val <- NA
+        if (!is.null(vals) && nrow(vals) > 0 && par %in% names(vals)) {
+          col <- vals[[par]]
+          if (is.numeric(col)) {
+            val <- col[1]
+          } else {
+            val <- as.character(col[1])
+          }
+        }
         tibble::tibble(
           longitude = coords_df$lon[i],
           latitude = coords_df$lat[i],

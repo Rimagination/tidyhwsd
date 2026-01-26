@@ -1,0 +1,76 @@
+---
+title: "tidyhwsd: tidy access to HWSD v2.0"
+author: "tidyhwsd authors"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{tidyhwsd overview}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE  # examples are non-evaluated to keep the vignette light
+)
+library(tidyhwsd)
+library(ggplot2)
+```
+
+## Overview
+
+`tidyhwsd` provides a tidyverse-friendly interface to the Harmonized World Soil Database (HWSD) v2.0. It keeps `terra` objects for performance but uses snake_case arguments and tibble outputs for point queries.
+
+## Download the HWSD grid
+
+The HWSD index grid (HWSD2.bil) is not shipped with the package. Download it once to a writable directory:
+
+```{r}
+hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
+```
+
+You can set `WS_PATH` in `~/.Renviron` to make the path persistent between sessions.
+
+## Point queries (tibble output)
+
+```{r}
+pt <- hwsd_extract(
+  location = c(120, 30),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "D:/data/HWSD2"
+)
+pt
+```
+
+## Bounding-box queries (SpatRaster)
+
+For large areas you can tile automatically:
+
+```{r}
+sand_cn <- hwsd_extract(
+  location = c(70, 18, 140, 54),
+  param = "SAND",
+  layer = "D1",
+  ws_path = "D:/data/HWSD2",
+  tiles_deg = 5,
+  cores = 4
+)
+```
+
+## Plotting with ggplot2
+
+```{r}
+# optional: ggplot2 + tidyterra
+# library(tidyterra)
+# ggplot() + tidyterra::geom_spatraster(data = sand_cn)
+```
+
+## Discover available properties
+
+```{r}
+hwsd_props()
+head(names(hwsd2))
+```

@@ -1,0 +1,36 @@
+Package: tidyhwsd
+Type: Package
+Title: Tidy Interface to HWSD v2.0 Data
+Version: 0.1.0
+Authors@R: c(
+    person(given = "Your",
+           family = "Name",
+           role = c("aut", "cre"),
+           email = "you@example.com")
+  )
+Description: Provides a tidyverse-friendly interface to the Harmonized World Soil
+    Database (HWSD) v2.0. Includes helpers to download the HWSD v2.0 index grid,
+    extract point or gridded attributes, list available properties, and plot
+    rasters with ggplot2 while keeping terra objects for performance.
+Depends:
+    R (>= 4.2)
+Imports:
+    terra,
+    sf,
+    cli,
+    dplyr,
+    tibble,
+    rlang,
+    httr
+Suggests:
+    ggplot2,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+License: AGPL-3 | file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2

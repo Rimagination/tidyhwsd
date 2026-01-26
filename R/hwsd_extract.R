@@ -137,7 +137,7 @@ hwsd_extract <- function(
     tile_fun <- function(row_id) {
       tile <- tiles[row_id, ]
       hwsd_extract(
-        location = c(
+        bbox = c(
           xbreaks[tile$ix],
           ybreaks[tile$iy],
           xbreaks[tile$ix + 1],

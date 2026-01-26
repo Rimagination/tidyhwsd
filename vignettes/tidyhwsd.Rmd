@@ -13,7 +13,7 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  eval = FALSE  # examples are non-evaluated to keep the vignette light
+  eval = FALSE
 )
 library(tidyhwsd)
 ```
@@ -41,8 +41,11 @@ pt <- hwsd_extract(
   layer = "D1",
   ws_path = "D:/data/HWSD2"
 )
+```
 
-# multiple points via data frame
+Multiple points can be provided as a data frame:
+
+```{r}
 sites <- data.frame(
   lon = c(120, 121.5),
   lat = c(30, 31.2)
@@ -53,7 +56,7 @@ pt_multi <- hwsd_extract(
   layer = "D1",
   ws_path = "D:/data/HWSD2"
 )
-pt
+pt_multi
 ```
 
 ## Bounding box queries (SpatRaster)
@@ -73,10 +76,12 @@ sand_cn <- hwsd_extract(
 
 ## Plotting with ggplot2
 
+This section uses ggplot2 and tidyterra.
+
 ```{r}
-# optional: ggplot2 + tidyterra
-# library(tidyterra)
-# ggplot() + tidyterra::geom_spatraster(data = sand_cn)
+library(ggplot2)
+library(tidyterra)
+ggplot() + tidyterra::geom_spatraster(data = sand_cn)
 ```
 
 ## Discover available properties

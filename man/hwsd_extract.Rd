@@ -26,7 +26,7 @@ hwsd_extract(coords = NULL, bbox = NULL, param = "ALL", layer = "D1",
 \item{verbose}{Show progress messages.}
 }
 \value{
-tibble for point queries; \code{terra::SpatRaster} (or file path if \code{internal=FALSE}) for bbox queries.
+tibble for point queries; \code{terra::SpatRaster} (or file path if \code{internal=FALSE}) for bbox queries. If \code{param} includes non-numeric fields, the \code{value} column is returned as character.
 }
 \description{
 Extract HWSD v2.0 attributes for points or bounding boxes using the downloaded index grid and bundled attribute table.

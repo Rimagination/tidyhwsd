@@ -2,31 +2,33 @@
 
 Tidyverse-friendly access to the Harmonized World Soil Database (HWSD) v2.0.
 
-## Installation (GitHub)
+## Installation
 
 ```r
-# install.packages("remotes")
 remotes::install_github("Rimagination/tidyhwsd")
 ```
 
 ## Workflow
 
-1) Download the HWSD index grid once (the directory is created if needed):
+1) Download the HWSD index grid once. The directory is created if needed.
 ```r
 library(tidyhwsd)
 hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
 ```
 
-2) Point query (returns a tibble):
+2) Point query. Returns a tibble.
 ```r
 pt <- hwsd_extract(
-  coords = c(120, 30),               # single point: c(lon, lat)
+  coords = c(120, 30),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
   ws_path = "D:/data/HWSD2"
 )
+```
 
-# multiple points via data frame
+Multiple points can be provided as a data frame or tibble:
+
+```r
 sites <- data.frame(
   lon = c(120, 121.5),
   lat = c(30, 31.2)
@@ -39,7 +41,7 @@ pt_multi <- hwsd_extract(
 )
 ```
 
-3) Bounding box query (returns a SpatRaster; tiling improves performance for large areas):
+3) Bounding box query. Returns a SpatRaster; tiling improves performance for large areas.
 ```r
 sand <- hwsd_extract(
   bbox = c(70, 18, 140, 54),
@@ -60,9 +62,10 @@ head(names(hwsd2))
 ```
 
 ### Plotting
-For ggplot2 workflows, use tidyterra (optional):
+For ggplot2 workflows, install tidyterra and use it to draw SpatRaster objects:
 ```r
-# install.packages("tidyterra")
+install.packages("tidyterra")
+library(ggplot2)
 library(tidyterra)
 ggplot() + tidyterra::geom_spatraster(data = sand)
 ```

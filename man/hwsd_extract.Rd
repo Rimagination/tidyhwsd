@@ -15,7 +15,7 @@ hwsd_extract(coords = NULL, bbox = NULL, param = "ALL", layer = "D1",
   \item A data.frame/tibble with columns lon and lat for multiple points.
 }}
 
-\item{bbox}{Numeric vector c(lon_min, lat_min, lon_max, lat_max) or an \code{sf} bbox for a bounding box. Provide either \code{point} or \code{bbox}, not both.}
+\item{bbox}{Numeric vector c(lon_min, lat_min, lon_max, lat_max) or an \code{sf} bbox for a bounding box. Provide either \code{coords} or \code{bbox}, not both.}
 \item{param}{Character vector of property names; \code{"ALL"} selects all available attributes (numeric-only for bbox).}
 \item{layer}{Soil layer code (\code{"D1"}--\code{"D7"}).}
 \item{path}{Output path when writing raster (used if \code{internal = FALSE}).}
@@ -41,7 +41,7 @@ hwsd_extract(
   ws_path = "D:/data/HWSD2"
 )
 
-# multiple points (stacked vector)
+# multiple points (data frame)
 pts <- data.frame(
   lon = c(120, 121.5),
   lat = c(30, 31.2)

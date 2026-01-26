@@ -11,7 +11,7 @@ remotes::install_github("Rimagination/tidyhwsd")
 
 ## Workflow
 
-1) Download the HWSD index grid once (auto-creates the directory):
+1) Download the HWSD index grid once (the directory is created if needed):
 ```r
 library(tidyhwsd)
 hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
@@ -39,7 +39,7 @@ pt_multi <- hwsd_extract(
 )
 ```
 
-3) Bounding-box query (returns a SpatRaster; tiling speeds up large areas):
+3) Bounding box query (returns a SpatRaster; tiling improves performance for large areas):
 ```r
 sand <- hwsd_extract(
   bbox = c(70, 18, 140, 54),

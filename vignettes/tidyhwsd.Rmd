@@ -16,7 +16,6 @@ knitr::opts_chunk$set(
   eval = FALSE  # examples are non-evaluated to keep the vignette light
 )
 library(tidyhwsd)
-library(ggplot2)
 ```
 
 ## Overview
@@ -37,7 +36,7 @@ You can set `WS_PATH` in `~/.Renviron` to make the path persistent between sessi
 
 ```{r}
 pt <- hwsd_extract(
-  coords = c(120, 30),  # or stacked c(lon1, lat1, lon2, lat2, ...)
+  coords = c(120, 30),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
   ws_path = "D:/data/HWSD2"
@@ -57,9 +56,9 @@ pt_multi <- hwsd_extract(
 pt
 ```
 
-## Bounding-box queries (SpatRaster)
+## Bounding box queries (SpatRaster)
 
-For large areas you can tile automatically:
+For large areas, enable tiling to improve performance:
 
 ```{r}
 sand_cn <- hwsd_extract(

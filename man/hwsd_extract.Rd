@@ -18,78 +18,31 @@ hwsd_extract(
 )
 }
 \arguments{
-\item{coords}{Point coordinates. Accepts one of the following:
-\itemize{
-\item Numeric vector \code{c(lon, lat)} for a single point
-\item Matrix with 2 columns (lon, lat) for multiple points
-\item Data frame with \code{lon} and \code{lat} columns
-}}
+\item{param}{Character vector of property names; \code{"ALL"} selects all available
+attributes. For \code{bbox} queries, non-numeric columns are automatically converted
+to factors in the resulting raster.}
 
-\item{bbox}{Bounding box as \code{c(lon_min, lat_min, lon_max, lat_max)}.
-Objects of class \code{bbox} (e.g., from \code{sf::st_bbox()}) are also accepted.
-Provide either \code{coords} or \code{bbox}, not both.}
-
-\item{param}{Character vector of property names (e.g., \code{"SAND"}, \code{"PH_WATER"}).
-Use \code{"ALL"} to select all available attributes (numeric-only for bbox queries).
-See \code{hwsd_props()} for available properties.}
-
-\item{layer}{Soil layer code, one of \code{"D1"}, \code{"D2"}, \code{"D3"}, \code{"D4"}, \code{"D5"},
-\code{"D6"}, or \code{"D7"} (from top to bottom).}
+\item{layer}{Soil layer code ("D1"–"D7").}
 
 \item{path}{Output path when writing raster (used if \code{internal = FALSE}).}
 
-\item{ws_path}{Path to the HWSD v2.0 index grid directory. If the grid is
-missing, it will be downloaded automatically. You can set the \code{WS_PATH}
-environment variable in \verb{~/.Renviron} for persistence.}
+\item{ws_path}{Path to HWSD index grid; will be downloaded if missing.}
 
 \item{internal}{If \code{TRUE}, return in-memory raster; if \code{FALSE}, write to \code{path}.}
 
-\item{tiles_deg}{Optional tiling size (degrees) for large bboxes. When finite
-and smaller than extent, tiles are processed and mosaicked for better
-performance.}
+\item{tiles_deg}{Optional tiling size (degrees) for large bboxes; when finite and
+smaller than extent, tiles are processed and mosaicked.}
 
-\item{cores}{Number of cores for parallel tiling (uses \code{parallel::mclapply}
-on non-Windows systems).}
+\item{cores}{Number of cores for tiling (uses \code{parallel::mclapply} on non-Windows).}
 
-\item{verbose}{If \code{TRUE}, show progress messages.}
+\item{verbose}{Show progress messages.}
+
+\item{location}{A point c(lon, lat) or bbox c(lon_min, lat_min, lon_max, lat_max);
+\code{sf} bbox objects are also accepted.}
 }
 \value{
-For point queries: a tibble with columns \code{longitude}, \code{latitude},
-\code{parameter}, and \code{value}. For bbox queries: a \code{terra::SpatRaster}
-(or file path if \code{internal = FALSE}).
+tibble for point queries; \code{terra::SpatRaster} (or file path if \code{internal=FALSE}) for bbox queries.
 }
 \description{
-Extract soil properties from the HWSD v2.0 database for point locations or
-bounding box regions.
-}
-\examples{
-\dontrun{
-# Single point query
-pt <- hwsd_extract(
-  coords = c(120, 30),
-  param = c("SAND", "PH_WATER"),
-  layer = "D1",
-  ws_path = "~/data/HWSD2"
-)
-
-# Multiple points using a data frame
-sites <- data.frame(lon = c(120, 121.5), lat = c(30, 31.2))
-pts <- hwsd_extract(
-  coords = sites,
-  param = "SAND",
-  layer = "D1",
-  ws_path = "~/data/HWSD2"
-)
-
-# Bounding box query with tiling
-sand <- hwsd_extract(
-  bbox = c(70, 18, 140, 54),
-  param = "SAND",
-  layer = "D1",
-  ws_path = "~/data/HWSD2",
-  tiles_deg = 5,
-  cores = 4
-)
-}
-
+Extract HWSD v2.0 attributes (point or bbox)
 }

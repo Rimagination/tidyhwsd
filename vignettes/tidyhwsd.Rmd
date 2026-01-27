@@ -79,6 +79,20 @@ sand_cn <- hwsd_extract(
 )
 ```
 
+### Categorical Data (e.g. Drainage)
+
+Categorical parameters are automatically converted to factor rasters with a built-in Raster Attribute Table (RAT), so you see meaningful labels instead of integers:
+
+```{r}
+drainage_cn <- hwsd_extract(
+  bbox = c(108, 30, 112, 34),
+  param = "DRAINAGE",
+  layer = "D1",
+  ws_path = "~/data/HWSD2"
+)
+terra::plot(drainage_cn, main = "Drainage Class")
+```
+
 ## Plotting with ggplot2
 
 This section uses ggplot2 and tidyterra.

@@ -1,68 +1,19 @@
 #' Extract HWSD v2.0 attributes (point or bbox)
 #'
-#' Extract soil properties from the HWSD v2.0 database for point locations or
-#' bounding box regions.
-#'
-#' @param coords Point coordinates. Accepts one of the following:
-#'   \itemize{
-#'     \item Numeric vector `c(lon, lat)` for a single point
-#'     \item Matrix with 2 columns (lon, lat) for multiple points
-#'     \item Data frame with `lon` and `lat` columns
-#'   }
-#' @param bbox Bounding box as `c(lon_min, lat_min, lon_max, lat_max)`.
-#'   Objects of class `bbox` (e.g., from `sf::st_bbox()`) are also accepted.
-#'   Provide either `coords` or `bbox`, not both.
-#' @param param Character vector of property names (e.g., `"SAND"`, `"PH_WATER"`).
-#'   Use `"ALL"` to select all available attributes (numeric-only for bbox queries).
-#'   See `hwsd_props()` for available properties.
-#' @param layer Soil layer code, one of `"D1"`, `"D2"`, `"D3"`, `"D4"`, `"D5"`,
-#'   `"D6"`, or `"D7"` (from top to bottom).
+#' @param location A point c(lon, lat) or bbox c(lon_min, lat_min, lon_max, lat_max);
+#'   `sf` bbox objects are also accepted.
+#' @param param Character vector of property names; `"ALL"` selects all available
+#'   attributes. For `bbox` queries, non-numeric columns are automatically converted
+#'   to factors in the resulting raster.
+#' @param layer Soil layer code ("D1"–"D7").
 #' @param path Output path when writing raster (used if `internal = FALSE`).
-#' @param ws_path Path to the HWSD v2.0 index grid directory. If the grid is
-#'   missing, it will be downloaded automatically. You can set the `WS_PATH`
-#'   environment variable in `~/.Renviron` for persistence.
+#' @param ws_path Path to HWSD index grid; will be downloaded if missing.
 #' @param internal If `TRUE`, return in-memory raster; if `FALSE`, write to `path`.
-#' @param tiles_deg Optional tiling size (degrees) for large bboxes. When finite
-#'   and smaller than extent, tiles are processed and mosaicked for better
-#'   performance.
-#' @param cores Number of cores for parallel tiling (uses `parallel::mclapply`
-#'   on non-Windows systems).
-#' @param verbose If `TRUE`, show progress messages.
-#'
-#' @return For point queries: a tibble with columns `longitude`, `latitude`,
-#'   `parameter`, and `value`. For bbox queries: a `terra::SpatRaster`
-#'   (or file path if `internal = FALSE`).
-#'
-#' @examples
-#' \dontrun{
-#' # Single point query
-#' pt <- hwsd_extract(
-#'   coords = c(110, 40),
-#'   param = c("SAND", "PH_WATER"),
-#'   layer = "D1",
-#'   ws_path = "~/data/HWSD2"
-#' )
-#'
-#' # Multiple points using a data frame
-#' sites <- data.frame(lon = c(120, 121.5), lat = c(30, 31.2))
-#' pts <- hwsd_extract(
-#'   coords = sites,
-#'   param = "SAND",
-#'   layer = "D1",
-#'   ws_path = "~/data/HWSD2"
-#' )
-#'
-#' # Bounding box query with tiling
-#' sand <- hwsd_extract(
-#'   bbox = c(70, 18, 140, 54),
-#'   param = "SAND",
-#'   layer = "D1",
-#'   ws_path = "~/data/HWSD2",
-#'   tiles_deg = 5,
-#'   cores = 4
-#' )
-#' }
-#'
+#' @param tiles_deg Optional tiling size (degrees) for large bboxes; when finite and
+#'   smaller than extent, tiles are processed and mosaicked.
+#' @param cores Number of cores for tiling (uses `parallel::mclapply` on non-Windows).
+#' @param verbose Show progress messages.
+#' @return tibble for point queries; `terra::SpatRaster` (or file path if `internal=FALSE`) for bbox queries.
 #' @export
 hwsd_extract <- function(
   coords = NULL,
@@ -260,8 +211,6 @@ hwsd_extract <- function(
           col <- vals[[par]]
           if (is.numeric(col)) {
             val <- col[1]
-            # HWSD v2.0 uses negative values for NoData (e.g. -9)
-            if (!is.na(val) && val < 0) val <- NA_real_
           } else {
             val <- as.character(col[1])
           }
@@ -273,17 +222,6 @@ hwsd_extract <- function(
           value = val
         )
       })
-
-      # If rows contain mixed types (numeric/character), coerce all to character
-      # to avoid dplyr::bind_rows() error
-      types <- vapply(rows, function(r) class(r$value)[1], character(1))
-      if ("character" %in% types) {
-        rows <- lapply(rows, function(r) {
-          r$value <- as.character(r$value)
-          r
-        })
-      }
-
       dplyr::bind_rows(rows)
     })
 
@@ -306,8 +244,6 @@ hwsd_extract <- function(
     if (!is.numeric(column)) {
       cli::cli_abort("Parameter {.val {param[j]}} is not numeric and cannot be rasterized.")
     }
-    # HWSD v2.0 uses negative values for NoData (e.g. -9)
-    column[column < 0] <- NA
     lookup <- stats::setNames(column, hwsd2$HWSD2_SMU_ID)
     param_mat[, j] <- lookup[as.character(ids_vec)]
   }

@@ -57,7 +57,18 @@ sand <- hwsd_extract(
 terra::plot(sand)
 ```
 
-4) Discover available properties:
+4) **Categorical data extraction** (e.g., Drainage Class). Returns a factor raster with labels:
+```r
+drainage <- hwsd_extract(
+  bbox = c(110, 30, 112, 32),
+  param = "DRAINAGE",
+  layer = "D1",
+  ws_path = "~/data/HWSD2"
+)
+terra::plot(drainage)
+```
+
+5) Discover available properties:
 ```r
 hwsd_props()
 head(names(hwsd2))

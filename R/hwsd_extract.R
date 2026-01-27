@@ -165,6 +165,14 @@ hwsd_extract <- function(
     mosaic <- do.call(terra::mosaic, rasters)
     names(mosaic) <- param
 
+    # Restore factor levels from the first tile (encoding is global)
+    if (length(rasters) > 0) {
+      r1 <- rasters[[1]]
+      # levels(r) <- val expects a list of data.frames (one per layer) or NULLs
+      # terra::levels(r1) returns exactly that structure
+      levels(mosaic) <- terra::levels(r1)
+    }
+
     if (internal) {
       return(mosaic)
     } else {
@@ -238,14 +246,27 @@ hwsd_extract <- function(
 
   ids_vec <- terra::values(cropped, mat = FALSE)
   param_mat <- matrix(NA_real_, nrow = length(ids_vec), ncol = length(param))
+  levels_list <- vector("list", length(param))
 
   for (j in seq_along(param)) {
     column <- hwsd2[[param[j]]]
-    if (!is.numeric(column)) {
-      cli::cli_abort("Parameter {.val {param[j]}} is not numeric and cannot be rasterized.")
+
+    if (is.numeric(column)) {
+      # HWSD v2.0 uses negative values for NoData (e.g. -9)
+      column[column < 0] <- NA
+      lookup <- stats::setNames(column, hwsd2$HWSD2_SMU_ID)
+      param_mat[, j] <- lookup[as.character(ids_vec)]
+    } else {
+      # Handle categorical/character data
+      f_col <- factor(column)
+      levels_list[[j]] <- data.frame(
+        id = seq_along(levels(f_col)),
+        category = levels(f_col)
+      )
+      vals <- as.integer(f_col)
+      lookup <- stats::setNames(vals, hwsd2$HWSD2_SMU_ID)
+      param_mat[, j] <- lookup[as.character(ids_vec)]
     }
-    lookup <- stats::setNames(column, hwsd2$HWSD2_SMU_ID)
-    param_mat[, j] <- lookup[as.character(ids_vec)]
   }
 
   ws_stack <- terra::rast(
@@ -253,6 +274,13 @@ hwsd_extract <- function(
   )
   ws_stack <- terra::setValues(ws_stack, param_mat)
   names(ws_stack) <- param
+
+  # Assign levels to categorical layers
+  for (j in seq_along(param)) {
+    if (!is.null(levels_list[[j]])) {
+      levels(ws_stack[[j]]) <- levels_list[[j]]
+    }
+  }
 
   if (internal) {
     return(ws_stack)

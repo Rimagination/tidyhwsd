@@ -230,6 +230,17 @@ hwsd_extract <- function(
           value = val
         )
       })
+
+      # If rows contain mixed types (numeric/character), coerce all to character
+      # to avoid dplyr::bind_rows() error
+      types <- vapply(rows, function(r) class(r$value)[1], character(1))
+      if ("character" %in% types) {
+        rows <- lapply(rows, function(r) {
+          r$value <- as.character(r$value)
+          r
+        })
+      }
+
       dplyr::bind_rows(rows)
     })
 

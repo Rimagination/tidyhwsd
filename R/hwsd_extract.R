@@ -13,7 +13,8 @@
 #'   smaller than extent, tiles are processed and mosaicked.
 #' @param cores Number of cores for tiling (uses `parallel::mclapply` on non-Windows).
 #' @param verbose Show progress messages.
-#' @return tibble for point queries; `terra::SpatRaster` (or file path if `internal=FALSE`) for bbox queries.
+#' @return Tibble with columns `lon`, `lat`, and one column per requested parameter (Wide Format) for point queries;
+#'   `terra::SpatRaster` (or file path if `internal=FALSE`) for bbox queries.
 #' @export
 hwsd_extract <- function(
   coords = NULL,
@@ -204,47 +205,33 @@ hwsd_extract <- function(
       smu_ids <- as.vector(pixel_vals)
     }
 
-    results <- lapply(seq_len(nrow(coords_df)), function(i) {
-      smu_id <- smu_ids[i]
-      vals <- if (!is.na(smu_id)) {
-        hwsd2 |>
-          dplyr::filter(HWSD2_SMU_ID == smu_id)
-      } else {
-        NULL
-      }
+    # Vectorized match
+    match_idx <- match(smu_ids, hwsd2$HWSD2_SMU_ID)
 
-      rows <- lapply(param, function(par) {
-        val <- NA
-        if (!is.null(vals) && nrow(vals) > 0 && par %in% names(vals)) {
-          col <- vals[[par]]
-          if (is.numeric(col)) {
-            val <- col[1]
-          } else {
-            val <- as.character(col[1])
-          }
+    # Pre-allocate result with coordinates
+    res <- coords_df
+
+    # Get attributes
+    if (length(param) > 0) {
+      # Subset the data for all matched IDs
+      # For unmatched IDs (NA in match_idx), we get rows of NAs which is correct
+      attrs <- hwsd2[match_idx, param, drop = FALSE]
+
+      # Clean numeric columns (negative -> NA)
+      for (p in names(attrs)) {
+        if (is.numeric(attrs[[p]])) {
+          col_vals <- attrs[[p]]
+          # Efficiently replace negative values with NA
+          col_vals[col_vals < 0] <- NA
+          attrs[[p]] <- col_vals
         }
-        tibble::tibble(
-          longitude = coords_df$lon[i],
-          latitude = coords_df$lat[i],
-          parameter = par,
-          value = val
-        )
-      })
-
-      # If rows contain mixed types (numeric/character), coerce all to character
-      # to avoid dplyr::bind_rows() error
-      types <- vapply(rows, function(r) class(r$value)[1], character(1))
-      if ("character" %in% types) {
-        rows <- lapply(rows, function(r) {
-          r$value <- as.character(r$value)
-          r
-        })
       }
 
-      dplyr::bind_rows(rows)
-    })
+      # Bind attributes to coordinates
+      res <- dplyr::bind_cols(res, attrs)
+    }
 
-    return(dplyr::bind_rows(results))
+    return(tibble::as_tibble(res))
   }
 
   # bbox workflow

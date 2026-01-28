@@ -21,8 +21,9 @@ test_that("point extract works with tiny mock grid", {
 
   expect_s3_class(res, "tbl_df")
   expect_equal(nrow(res), 1)
-  # Verify that we got an actual value, not NA (regression test for ID column bug)
-  expect_false(is.na(res$value[1]))
+  # Verify that we got an actual value in the parameter column
+  val <- res[[num_cols[1]]]
+  expect_false(is.na(val))
 })
 
 test_that("bbox extract returns SpatRaster", {
@@ -74,8 +75,8 @@ test_that("data.frame multi-point input works", {
 
   expect_s3_class(res, "tbl_df")
   expect_equal(nrow(res), 2)
-  expect_equal(res$longitude, c(0.5, 1.5))
-  expect_equal(res$latitude, c(0.5, 1.5))
+  expect_equal(res$lon, c(0.5, 1.5))
+  expect_equal(res$lat, c(0.5, 1.5))
 })
 
 test_that("ocean/invalid coordinates return NA", {
@@ -100,7 +101,9 @@ test_that("ocean/invalid coordinates return NA", {
   )
 
   expect_s3_class(res, "tbl_df")
-  expect_true(is.na(res$value[1]))
+  # In wide format, the parameter column should contain NA
+  val <- res[[num_cols[1]]]
+  expect_true(is.na(val[1]))
 })
 
 test_that("input validation errors work correctly", {

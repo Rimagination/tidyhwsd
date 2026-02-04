@@ -6,16 +6,6 @@ Tidyverse-friendly access to the Harmonized World Soil Database (HWSD) v2.0.
 
 Website: https://rimagination.github.io/tidyhwsd
 
-## Motivation & Rationale
-
-HWSD 2.0 is a component-based soil association dataset: a single SMU x layer can
-contain multiple components, each with a SEQUENCE and SHARE. The previous
-pre-collapsed table obscured this structure and forced implicit choices (e.g.,
-dominant-only). This version uses the component table as the single source of
-truth and exposes explicit aggregation options (dominant vs. share-weighted,
-categorical mode vs. distribution). Defaults remain reasonable and compatible
-with prior behavior, while enabling transparent, configurable analysis.
-
 ## Installation
 
 ```r
@@ -23,39 +13,23 @@ install.packages("remotes")
 remotes::install_github("Rimagination/tidyhwsd")
 ```
 
-## Requirements
+## Minimal example
 
-- R >= 4.1
-- Packages: terra, dplyr, tibble, readr
-
-## Workflow
-
-1. Download the HWSD index grid once. The directory is created if needed.
-   The download is several GB, so plan for disk space and time. If your network
-   is slow, you can manually download the grid zip from FAO
-   ([HWSD Raster v2.0](https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip))
-   and extract it
-   into the target folder so it contains `HWSD2.bil` (then `hwsd_download()` will
-   skip the download step).
 ```r
 library(tidyhwsd)
 
-# Replace with your preferred path, or set WS_PATH in ~/.Renviron
+# Download the HWSD index grid once
 hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
-```
 
-2. Point query. Returns dominant component values.
-```r
+# Dominant-component values (default)
 pt <- hwsd_extract(
   coords = c(110, 40),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
   ws_path = "D:/data/HWSD2"
 )
-```
 
-Optional: share-weighted synthesis with per-variable rules:
-```r
+# Share-weighted synthesis
 props <- hwsd_props()
 pt_syn <- hwsd_compose(
   coords = c(110, 40),
@@ -66,67 +40,10 @@ pt_syn <- hwsd_compose(
 )
 ```
 
-Multiple points can be provided as a data frame or tibble:
+## Notes
 
-```r
-sites <- data.frame(
-  lon = c(120, 121.5),
-  lat = c(30, 31.2)
-)
-pt_multi <- hwsd_extract(
-  coords = sites,
-  param = "SAND",
-  layer = "D1",
-  ws_path = "D:/data/HWSD2"
-)
-```
-
-3. Bounding box query. Returns a SpatRaster; tiling improves performance for large areas.
-```r
-sand <- hwsd_extract(
-  bbox = c(70, 18, 140, 54),
-  param = "SAND",
-  layer = "D1",
-  ws_path = "D:/data/HWSD2",
-  tiles_deg = 5,
-  cores = 4,
-  internal = TRUE
-)
-terra::plot(sand)
-```
-
-4. **Categorical data extraction** (e.g., Drainage Class). Returns a factor raster with labels:
-```r
-drainage <- hwsd_extract(
-  bbox = c(110, 30, 112, 32),
-  param = "DRAINAGE",
-  layer = "D1",
-  ws_path = "D:/data/HWSD2"
-)
-terra::plot(drainage)
-```
-
-5. Discover available properties:
-```r
-hwsd_props()
-```
-
-## Environment Variable
-
-To avoid specifying `ws_path` in every call, add the following to your `~/.Renviron` file:
-
-```
-WS_PATH=D:/data/HWSD2
-```
-
-Then restart R. The package will automatically use this path.
-
-## Plotting
-
-For ggplot2 workflows, install tidyterra and use it to draw SpatRaster objects:
-```r
-install.packages("tidyterra")
-library(ggplot2)
-library(tidyterra)
-ggplot() + tidyterra::geom_spatraster(data = sand)
-```
+- Full tutorial and examples: https://rimagination.github.io/tidyhwsd/articles/tidyhwsd.html
+- Units and aggregation guide: https://rimagination.github.io/tidyhwsd/articles/units-and-aggregation.html
+- Set `WS_PATH` in `~/.Renviron` to avoid passing `ws_path` every time.
+- If downloads are slow, manually download and extract the grid zip so `HWSD2.bil` exists:
+  https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip

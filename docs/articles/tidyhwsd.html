@@ -75,6 +75,55 @@ authors</h4>
 Harmonized World Soil Database (HWSD) v2.0. It keeps <code>terra</code>
 objects for performance but uses snake_case arguments and tibble outputs
 for point queries.</p>
+<p>This vignette goes beyond the README by mapping key concepts from the
+HWSD v2.0 manual to the functions and data objects in the package, and
+by explaining when to use dominant vs. composed values.</p>
+</div>
+<div class="section level2">
+<h2 id="hwsd-v2-0-data-model-from-the-manual">HWSD v2.0 data model (from the manual)<a class="anchor" aria-label="anchor" href="#hwsd-v2-0-data-model-from-the-manual"></a>
+</h2>
+<p>HWSD v2.0 is built around a global grid of soil mapping units (SMU).
+The grid is provided as a 30 arc-second (~1 km) raster in ESRI BIL
+format. Each grid cell stores an SMU identifier that links to the
+attribute tables.</p>
+<p>Each SMU can contain multiple <strong>components</strong>. For each
+component, the manual defines:</p>
+<ul>
+<li>
+<code>SEQUENCE</code>: the ordering of components (sequence 1 is
+dominant)</li>
+<li>
+<code>SHARE</code>: percent share within the SMU (sums to ~100)</li>
+<li>
+<code>LAYER</code>: depth layer, with seven standard layers
+(D1-D7)</li>
+</ul>
+<p>The seven layers correspond to 0-20, 20-40, 40-60, 60-80, 80-100,
+100-150, and 150-200 cm.</p>
+</div>
+<div class="section level2">
+<h2 id="how-tidyhwsd-maps-the-manual-to-code">How tidyhwsd maps the manual to code<a class="anchor" aria-label="anchor" href="#how-tidyhwsd-maps-the-manual-to-code"></a>
+</h2>
+<ul>
+<li>
+<code><a href="../reference/hwsd_download.html">hwsd_download()</a></code> retrieves the raster grid (BIL) used
+for SMU indexing.</li>
+<li>
+<code>hwsd2_layers</code> is the component table keyed by
+<code>HWSD2_SMU_ID</code>, <code>LAYER</code>, <code>SEQUENCE</code>,
+and <code>SHARE</code>.</li>
+<li>
+<code>hwsd2</code> is the pre-collapsed SMU x layer attribute
+table.</li>
+<li>
+<code><a href="../reference/hwsd_extract.html">hwsd_extract()</a></code> returns dominant-component values by
+default (compatible with legacy workflows).</li>
+<li>
+<code><a href="../reference/hwsd_compose.html">hwsd_compose()</a></code> performs share-weighted synthesis using
+rules from <code><a href="../reference/hwsd_props.html">hwsd_props()</a></code>.</li>
+</ul>
+<p>If you want to work directly with components (e.g., custom
+aggregation), start from <code>hwsd2_layers</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="download-the-hwsd-grid">Download the HWSD grid<a class="anchor" aria-label="anchor" href="#download-the-hwsd-grid"></a>
@@ -84,9 +133,44 @@ Download it once to a writable directory:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Replace with your preferred path</span></span>
 <span><span class="fu"><a href="../reference/hwsd_download.html">hwsd_download</a></span><span class="op">(</span>ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<p>If the download is slow, you can manually download the grid zip from
+FAO and extract it so the folder contains <code>HWSD2.bil</code>:</p>
+<p><a href="https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip" class="external-link uri">https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip</a></p>
+<p><code><a href="../reference/hwsd_extract.html">hwsd_extract()</a></code> will also use a <code>HWSD2.tif</code> if
+you convert the BIL to GeoTIFF.</p>
 <p>You can set <code>WS_PATH</code> in <code>~/.Renviron</code> to make
 the path persistent between sessions:</p>
 <pre><code>WS_PATH=~/data/HWSD2</code></pre>
+</div>
+<div class="section level2">
+<h2 id="choosing-parameters-and-layers">Choosing parameters and layers<a class="anchor" aria-label="anchor" href="#choosing-parameters-and-layers"></a>
+</h2>
+<p>Use <code><a href="../reference/hwsd_props.html">hwsd_props()</a></code> to inspect available properties and
+their default aggregation rules. The special value
+<code>param = "ALL"</code> selects all properties for point extraction.
+For bounding boxes, non-numeric fields are dropped when
+<code>param = "ALL"</code> (since raster stacks must be numeric).</p>
+<p>Layer rules:</p>
+<ul>
+<li>For point queries, <code>layer</code> can be length 1 (wide output)
+or multiple layers with <code>output = "long"</code>.</li>
+<li>For bbox queries, <code>layer</code> must be length 1.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="spatial-inputs">Spatial inputs<a class="anchor" aria-label="anchor" href="#spatial-inputs"></a>
+</h2>
+<p>All spatial inputs are in longitude/latitude (EPSG:4326):</p>
+<ul>
+<li>
+<code>coords</code>: a numeric vector <code>c(lon, lat)</code>, a
+2-column matrix, or a data frame with <code>lon</code> and
+<code>lat</code>.</li>
+<li>
+<code>bbox</code>:
+<code>c(lon_min, lat_min, lon_max, lat_max)</code> or an <code>sf</code>
+bbox.</li>
+</ul>
 </div>
 <div class="section level2">
 <h2 id="point-queries-tibble-output">Point queries (tibble output)<a class="anchor" aria-label="anchor" href="#point-queries-tibble-output"></a>
@@ -101,8 +185,8 @@ the path persistent between sessions:</p>
 <p>Multiple points can be provided as a data frame:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sites</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  lon <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">120</span>, <span class="fl">121.5</span><span class="op">)</span>,</span>
-<span>  lat <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">31.2</span><span class="op">)</span></span>
+<span>  lon <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">112.5</span><span class="op">)</span>,</span>
+<span>  lat <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">40</span>, <span class="fl">34.5</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">pt_multi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_extract.html">hwsd_extract</a></span><span class="op">(</span></span>
 <span>  coords <span class="op">=</span> <span class="va">sites</span>,</span>
@@ -113,8 +197,36 @@ the path persistent between sessions:</p>
 <span><span class="va">pt_multi</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="aggregation-options-concise">Aggregation options (concise)<a class="anchor" aria-label="anchor" href="#aggregation-options-concise"></a>
+<h2 id="dominant-vs--composed-values">Dominant vs. composed values<a class="anchor" aria-label="anchor" href="#dominant-vs--composed-values"></a>
 </h2>
+<p>The HWSD manual notes that an SMU may contain multiple soil
+components. There are two common ways to summarize them:</p>
+<ul>
+<li>
+<strong>Dominant</strong> values represent the dominant component
+(sequence 1, then largest share).</li>
+<li>
+<strong>Composed</strong> values use component shares to compute
+weighted summaries.</li>
+</ul>
+<p><code><a href="../reference/hwsd_extract.html">hwsd_extract()</a></code> uses the dominant component by default.
+This is consistent with many legacy workflows and avoids misleading
+averages when a small share has an extreme value. If you need a
+share-weighted summary, use <code><a href="../reference/hwsd_compose.html">hwsd_compose()</a></code> with rules from
+<code><a href="../reference/hwsd_props.html">hwsd_props()</a></code>.</p>
+<p>Dominant selection logic:</p>
+<ul>
+<li>Prefer <code>SEQUENCE = 1</code> if present</li>
+<li>Within <code>SEQUENCE = 1</code>, pick the largest
+<code>SHARE</code>
+</li>
+<li>If no <code>SEQUENCE = 1</code> exists, pick the largest
+<code>SHARE</code>
+</li>
+</ul>
+<div class="section level3">
+<h3 id="default-share-weighted-synthesis">Default share-weighted synthesis<a class="anchor" aria-label="anchor" href="#default-share-weighted-synthesis"></a>
+</h3>
 <p><code><a href="../reference/hwsd_extract.html">hwsd_extract()</a></code> returns dominant-component values by
 default. For share-weighted composition, use <code><a href="../reference/hwsd_compose.html">hwsd_compose()</a></code>
 with rules from <code><a href="../reference/hwsd_props.html">hwsd_props()</a></code>:</p>
@@ -127,12 +239,65 @@ with rules from <code><a href="../reference/hwsd_props.html">hwsd_props()</a></c
 <span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>,</span>
 <span>  props <span class="op">=</span> <span class="va">props</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Default aggregation rules (from <code><a href="../reference/hwsd_props.html">hwsd_props()</a></code>):</p>
+<ul>
+<li>Numeric fields use <code>weighted_mean</code>
+</li>
+<li>Categorical fields use <code>weighted_mode</code>
+</li>
+<li>ID-like fields are <code>drop</code>
+</li>
+<li>Numeric outputs are rounded to the <code>precision</code> step</li>
+</ul>
+<p>Negative numeric values are treated as missing, and shares are
+normalized if they do not sum to 100.</p>
+</div>
+<div class="section level3">
+<h3 id="per-variable-aggregation-rules">Per-variable aggregation rules<a class="anchor" aria-label="anchor" href="#per-variable-aggregation-rules"></a>
+</h3>
+<p>You can override aggregation on a per-variable basis. For example,
+keep pH as dominant while averaging textures:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">props</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_props.html">hwsd_props</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">props</span><span class="op">$</span><span class="va">agg</span><span class="op">[</span><span class="va">props</span><span class="op">$</span><span class="va">property</span> <span class="op">==</span> <span class="st">"PH_WATER"</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"dominant"</span></span>
+<span></span>
+<span><span class="va">pt_mixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_compose.html">hwsd_compose</a></span><span class="op">(</span></span>
+<span>  coords <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">40</span><span class="op">)</span>,</span>
+<span>  param <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SAND"</span>, <span class="st">"PH_WATER"</span><span class="op">)</span>,</span>
+<span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
+<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>,</span>
+<span>  props <span class="op">=</span> <span class="va">props</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>You can also pass a named vector for quick overrides:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agg</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>PH_WATER <span class="op">=</span> <span class="st">"dominant"</span>, SAND <span class="op">=</span> <span class="st">"weighted_mean"</span><span class="op">)</span></span>
+<span><span class="va">pt_named</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_compose.html">hwsd_compose</a></span><span class="op">(</span></span>
+<span>  coords <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">40</span><span class="op">)</span>,</span>
+<span>  param <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SAND"</span>, <span class="st">"PH_WATER"</span><span class="op">)</span>,</span>
+<span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
+<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>,</span>
+<span>  props <span class="op">=</span> <span class="va">agg</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code>hwsd_extract(props = ...)</code> is equivalent to
+<code><a href="../reference/hwsd_compose.html">hwsd_compose()</a></code> and can be used to keep a single entry
+point:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">props</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_props.html">hwsd_props</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">props</span><span class="op">$</span><span class="va">agg</span><span class="op">[</span><span class="va">props</span><span class="op">$</span><span class="va">property</span> <span class="op">==</span> <span class="st">"PH_WATER"</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"dominant"</span></span>
+<span><span class="va">pt_syn2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_extract.html">hwsd_extract</a></span><span class="op">(</span></span>
+<span>  coords <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">40</span><span class="op">)</span>,</span>
+<span>  param <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SAND"</span>, <span class="st">"PH_WATER"</span><span class="op">)</span>,</span>
+<span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
+<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>,</span>
+<span>  props <span class="op">=</span> <span class="va">props</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="bounding-box-queries-spatraster">Bounding box queries (SpatRaster)<a class="anchor" aria-label="anchor" href="#bounding-box-queries-spatraster"></a>
 </h2>
 <p>For large areas, enable tiling to improve performance:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sand_cn</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_extract.html">hwsd_extract</a></span><span class="op">(</span></span>
 <span>  bbox <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">70</span>, <span class="fl">18</span>, <span class="fl">140</span>, <span class="fl">54</span><span class="op">)</span>,</span>
 <span>  param <span class="op">=</span> <span class="st">"SAND"</span>,</span>
@@ -141,13 +306,39 @@ with rules from <code><a href="../reference/hwsd_props.html">hwsd_props()</a></c
 <span>  tiles_deg <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">4</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Regional extraction notes:</p>
+<ul>
+<li>Bbox queries return a <code><a href="https://rdrr.io/pkg/terra/man/SpatRaster-class.html" class="external-link">terra::SpatRaster</a></code>; point queries
+return a tibble.</li>
+<li>Use <code>internal = FALSE</code> to write GeoTIFFs to disk (returns
+the output path).</li>
+<li>On Windows, <code>cores</code> falls back to sequential processing
+(parallel is used on non-Windows).</li>
+<li>If you need categorical rasters (e.g., <code>DRAINAGE</code>),
+request them explicitly rather than using
+<code>param = "ALL"</code>.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="working-across-layers">Working across layers<a class="anchor" aria-label="anchor" href="#working-across-layers"></a>
+</h2>
+<p>Use <code>output = "long"</code> when extracting multiple layers at
+once:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pt_layers</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_extract.html">hwsd_extract</a></span><span class="op">(</span></span>
+<span>  coords <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">40</span><span class="op">)</span>,</span>
+<span>  param <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SAND"</span>, <span class="st">"PH_WATER"</span><span class="op">)</span>,</span>
+<span>  layer <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"D1"</span>, <span class="st">"D2"</span>, <span class="st">"D3"</span><span class="op">)</span>,</span>
+<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>,</span>
+<span>  output <span class="op">=</span> <span class="st">"long"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="categorical-data-e-g--drainage">Categorical Data (e.g. Drainage)<a class="anchor" aria-label="anchor" href="#categorical-data-e-g--drainage"></a>
 </h3>
 <p>Categorical parameters are automatically converted to factor rasters
 with a built-in Raster Attribute Table (RAT), so you see meaningful
 labels instead of integers:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">drainage_cn</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hwsd_extract.html">hwsd_extract</a></span><span class="op">(</span></span>
 <span>  bbox <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">108</span>, <span class="fl">30</span>, <span class="fl">112</span>, <span class="fl">34</span><span class="op">)</span>,</span>
 <span>  param <span class="op">=</span> <span class="st">"DRAINAGE"</span>,</span>
@@ -158,19 +349,29 @@ labels instead of integers:</p>
 </div>
 </div>
 <div class="section level2">
+<h2 id="data-quality-and-scale">Data quality and scale<a class="anchor" aria-label="anchor" href="#data-quality-and-scale"></a>
+</h2>
+<p>The manual emphasizes that HWSD v2.0 is a global product assembled
+from multiple sources with varying scales and survey methods. It is
+well-suited for regional and global modeling, but for national or local
+studies, national harmonized soil databases are preferred when
+available. Use dominant vs. composed summaries consciously, especially
+when a small component has extreme values.</p>
+</div>
+<div class="section level2">
 <h2 id="plotting-with-ggplot2">Plotting with ggplot2<a class="anchor" aria-label="anchor" href="#plotting-with-ggplot2"></a>
 </h2>
 <p>This section uses ggplot2 and tidyterra.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dieghernan.github.io/tidyterra/" class="external-link">tidyterra</a></span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">tidyterra</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/tidyterra/man/geom_spatraster.html" class="external-link">geom_spatraster</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">sand_cn</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">tidyterra</span><span class="fu">::</span><span class="fu"><a href="https://dieghernan.github.io/tidyterra/reference/geom_spatraster.html" class="external-link">geom_spatraster</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">sand_cn</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="discover-available-properties">Discover available properties<a class="anchor" aria-label="anchor" href="#discover-available-properties"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/hwsd_props.html">hwsd_props</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

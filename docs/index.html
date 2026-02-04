@@ -71,19 +71,28 @@
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"Rimagination/tidyhwsd"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"Rimagination/tidyhwsd"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="requirements">Requirements<a class="anchor" aria-label="anchor" href="#requirements"></a>
+</h2>
+<ul>
+<li>R &gt;= 4.1</li>
+<li>Packages: terra, dplyr, tibble, readr</li>
+</ul>
 </div>
 <div class="section level2">
 <h2 id="workflow">Workflow<a class="anchor" aria-label="anchor" href="#workflow"></a>
 </h2>
 <ol style="list-style-type: decimal">
-<li>Download the HWSD index grid once. The directory is created if needed.</li>
+<li>Download the HWSD index grid once. The directory is created if needed. The download is several GB, so plan for disk space and time. If your network is slow, you can manually download the grid zip from FAO (<a href="https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip" class="external-link">HWSD Raster v2.0</a>) and extract it into the target folder so it contains <code>HWSD2.bil</code> (then <code><a href="reference/hwsd_download.html">hwsd_download()</a></code> will skip the download step).</li>
 </ol>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://rimagination.github.io/tidyhwsd">tidyhwsd</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Replace with your preferred path, or set WS_PATH in ~/.Renviron</span></span>
-<span><span class="fu"><a href="reference/hwsd_download.html">hwsd_download</a></span><span class="op">(</span>ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="reference/hwsd_download.html">hwsd_download</a></span><span class="op">(</span>ws_path <span class="op">=</span> <span class="st">"D:/data/HWSD2"</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <ol start="2" style="list-style-type: decimal">
 <li>Point query. Returns dominant component values.</li>
 </ol>
@@ -92,7 +101,7 @@
 <span>  coords <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">40</span><span class="op">)</span>,</span>
 <span>  param <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SAND"</span>, <span class="st">"PH_WATER"</span><span class="op">)</span>,</span>
 <span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
-<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span></span>
+<span>  ws_path <span class="op">=</span> <span class="st">"D:/data/HWSD2"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Optional: share-weighted synthesis with per-variable rules:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
@@ -101,7 +110,7 @@
 <span>  coords <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">40</span><span class="op">)</span>,</span>
 <span>  param <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SAND"</span>, <span class="st">"PH_WATER"</span><span class="op">)</span>,</span>
 <span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
-<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>,</span>
+<span>  ws_path <span class="op">=</span> <span class="st">"D:/data/HWSD2"</span>,</span>
 <span>  props <span class="op">=</span> <span class="va">props</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Multiple points can be provided as a data frame or tibble:</p>
@@ -114,7 +123,7 @@
 <span>  coords <span class="op">=</span> <span class="va">sites</span>,</span>
 <span>  param <span class="op">=</span> <span class="st">"SAND"</span>,</span>
 <span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
-<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span></span>
+<span>  ws_path <span class="op">=</span> <span class="st">"D:/data/HWSD2"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <ol start="3" style="list-style-type: decimal">
 <li>Bounding box query. Returns a SpatRaster; tiling improves performance for large areas.</li>
@@ -124,12 +133,12 @@
 <span>  bbox <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">70</span>, <span class="fl">18</span>, <span class="fl">140</span>, <span class="fl">54</span><span class="op">)</span>,</span>
 <span>  param <span class="op">=</span> <span class="st">"SAND"</span>,</span>
 <span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
-<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span>,</span>
+<span>  ws_path <span class="op">=</span> <span class="st">"D:/data/HWSD2"</span>,</span>
 <span>  tiles_deg <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  internal <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
-<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sand</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/terra/man/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">sand</span><span class="op">)</span></span></code></pre></div>
 <ol start="4" style="list-style-type: decimal">
 <li>
 <strong>Categorical data extraction</strong> (e.g., Drainage Class). Returns a factor raster with labels:</li>
@@ -139,9 +148,9 @@
 <span>  bbox <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">110</span>, <span class="fl">30</span>, <span class="fl">112</span>, <span class="fl">32</span><span class="op">)</span>,</span>
 <span>  param <span class="op">=</span> <span class="st">"DRAINAGE"</span>,</span>
 <span>  layer <span class="op">=</span> <span class="st">"D1"</span>,</span>
-<span>  ws_path <span class="op">=</span> <span class="st">"~/data/HWSD2"</span></span>
+<span>  ws_path <span class="op">=</span> <span class="st">"D:/data/HWSD2"</span></span>
 <span><span class="op">)</span></span>
-<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">drainage</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/terra/man/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">drainage</span><span class="op">)</span></span></code></pre></div>
 <ol start="5" style="list-style-type: decimal">
 <li>Discover available properties:</li>
 </ol>
@@ -152,7 +161,7 @@
 <h2 id="environment-variable">Environment Variable<a class="anchor" aria-label="anchor" href="#environment-variable"></a>
 </h2>
 <p>To avoid specifying <code>ws_path</code> in every call, add the following to your <code>~/.Renviron</code> file:</p>
-<pre><code>WS_PATH=~/data/HWSD2</code></pre>
+<pre><code>WS_PATH=D:/data/HWSD2</code></pre>
 <p>Then restart R. The package will automatically use this path.</p>
 </div>
 <div class="section level2">
@@ -163,7 +172,7 @@
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"tidyterra"</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dieghernan.github.io/tidyterra/" class="external-link">tidyterra</a></span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span> <span class="fu">tidyterra</span><span class="fu">::</span><span class="fu"><a href="https://dieghernan.github.io/tidyterra/reference/geom_spatraster.html" class="external-link">geom_spatraster</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">sand</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span> <span class="fu">tidyterra</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/tidyterra/man/geom_spatraster.html" class="external-link">geom_spatraster</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">sand</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

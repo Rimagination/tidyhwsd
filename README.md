@@ -19,26 +19,38 @@ with prior behavior, while enabling transparent, configurable analysis.
 ## Installation
 
 ```r
+install.packages("remotes")
 remotes::install_github("Rimagination/tidyhwsd")
 ```
 
+## Requirements
+
+- R >= 4.1
+- Packages: terra, dplyr, tibble, readr
+
 ## Workflow
 
-1) Download the HWSD index grid once. The directory is created if needed.
+1. Download the HWSD index grid once. The directory is created if needed.
+   The download is several GB, so plan for disk space and time. If your network
+   is slow, you can manually download the grid zip from FAO
+   ([HWSD Raster v2.0](https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip))
+   and extract it
+   into the target folder so it contains `HWSD2.bil` (then `hwsd_download()` will
+   skip the download step).
 ```r
 library(tidyhwsd)
 
 # Replace with your preferred path, or set WS_PATH in ~/.Renviron
-hwsd_download(ws_path = "~/data/HWSD2", verbose = TRUE)
+hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
 ```
 
-2) Point query. Returns dominant component values.
+2. Point query. Returns dominant component values.
 ```r
 pt <- hwsd_extract(
   coords = c(110, 40),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
-  ws_path = "~/data/HWSD2"
+  ws_path = "D:/data/HWSD2"
 )
 ```
 
@@ -49,7 +61,7 @@ pt_syn <- hwsd_compose(
   coords = c(110, 40),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
-  ws_path = "~/data/HWSD2",
+  ws_path = "D:/data/HWSD2",
   props = props
 )
 ```
@@ -65,17 +77,17 @@ pt_multi <- hwsd_extract(
   coords = sites,
   param = "SAND",
   layer = "D1",
-  ws_path = "~/data/HWSD2"
+  ws_path = "D:/data/HWSD2"
 )
 ```
 
-3) Bounding box query. Returns a SpatRaster; tiling improves performance for large areas.
+3. Bounding box query. Returns a SpatRaster; tiling improves performance for large areas.
 ```r
 sand <- hwsd_extract(
   bbox = c(70, 18, 140, 54),
   param = "SAND",
   layer = "D1",
-  ws_path = "~/data/HWSD2",
+  ws_path = "D:/data/HWSD2",
   tiles_deg = 5,
   cores = 4,
   internal = TRUE
@@ -83,18 +95,18 @@ sand <- hwsd_extract(
 terra::plot(sand)
 ```
 
-4) **Categorical data extraction** (e.g., Drainage Class). Returns a factor raster with labels:
+4. **Categorical data extraction** (e.g., Drainage Class). Returns a factor raster with labels:
 ```r
 drainage <- hwsd_extract(
   bbox = c(110, 30, 112, 32),
   param = "DRAINAGE",
   layer = "D1",
-  ws_path = "~/data/HWSD2"
+  ws_path = "D:/data/HWSD2"
 )
 terra::plot(drainage)
 ```
 
-5) Discover available properties:
+5. Discover available properties:
 ```r
 hwsd_props()
 ```
@@ -104,7 +116,7 @@ hwsd_props()
 To avoid specifying `ws_path` in every call, add the following to your `~/.Renviron` file:
 
 ```
-WS_PATH=~/data/HWSD2
+WS_PATH=D:/data/HWSD2
 ```
 
 Then restart R. The package will automatically use this path.

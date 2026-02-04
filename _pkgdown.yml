@@ -18,4 +18,5 @@ reference:
       - hwsd_download
   - title: Data
     contents:
+      - hwsd2
       - hwsd2_layers

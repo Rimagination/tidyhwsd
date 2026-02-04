@@ -1,0 +1,271 @@
+---
+title: "tidyhwsd: full tutorial"
+author: "tidyhwsd authors"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{tidyhwsd: full tutorial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+library(tidyhwsd)
+```
+
+## Overview
+
+`tidyhwsd` provides a tidyverse-friendly interface to the Harmonized World Soil Database (HWSD) v2.0. It keeps `terra` objects for performance but uses snake_case arguments and tibble outputs for point queries.
+
+This vignette goes beyond the README by mapping key concepts from the HWSD v2.0 manual to the functions and data objects in the package, and by explaining when to use dominant vs. composed values.
+
+## HWSD v2.0 data model (from the manual)
+
+HWSD v2.0 is built around a global grid of soil mapping units (SMU). The grid is provided as a 30 arc-second (~1 km) raster in ESRI BIL format. Each grid cell stores an SMU identifier that links to the attribute tables.
+
+Each SMU can contain multiple **components**. For each component, the manual defines:
+
+- `SEQUENCE`: the ordering of components (sequence 1 is dominant)
+- `SHARE`: percent share within the SMU (sums to ~100)
+- `LAYER`: depth layer, with seven standard layers (D1-D7)
+
+The seven layers correspond to 0-20, 20-40, 40-60, 60-80, 80-100, 100-150, and 150-200 cm.
+
+## How tidyhwsd maps the manual to code
+
+- `hwsd_download()` retrieves the raster grid (BIL) used for SMU indexing.
+- `hwsd2_layers` is the component table keyed by `HWSD2_SMU_ID`, `LAYER`, `SEQUENCE`, and `SHARE`.
+- `hwsd2` is the pre-collapsed SMU x layer attribute table.
+- `hwsd_extract()` returns dominant-component values by default (compatible with legacy workflows).
+- `hwsd_compose()` performs share-weighted synthesis using rules from `hwsd_props()`.
+
+If you want to work directly with components (e.g., custom aggregation), start from `hwsd2_layers`.
+
+## Download the HWSD grid
+
+The HWSD index grid (HWSD2.bil) is not shipped with the package. Download it once to a writable directory:
+
+```{r}
+# Replace with your preferred path
+hwsd_download(ws_path = "~/data/HWSD2", verbose = TRUE)
+```
+
+If the download is slow, you can manually download the grid zip from FAO and extract it so the
+folder contains `HWSD2.bil`:
+
+https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip
+
+`hwsd_extract()` will also use a `HWSD2.tif` if you convert the BIL to GeoTIFF.
+
+You can set `WS_PATH` in `~/.Renviron` to make the path persistent between sessions:
+
+```
+WS_PATH=~/data/HWSD2
+```
+
+## Choosing parameters and layers
+
+Use `hwsd_props()` to inspect available properties and their default aggregation rules. The
+special value `param = "ALL"` selects all properties for point extraction. For bounding boxes,
+non-numeric fields are dropped when `param = "ALL"` (since raster stacks must be numeric).
+
+Layer rules:
+
+- For point queries, `layer` can be length 1 (wide output) or multiple layers with `output = "long"`.
+- For bbox queries, `layer` must be length 1.
+
+## Spatial inputs
+
+All spatial inputs are in longitude/latitude (EPSG:4326):
+
+- `coords`: a numeric vector `c(lon, lat)`, a 2-column matrix, or a data frame with `lon` and `lat`.
+- `bbox`: `c(lon_min, lat_min, lon_max, lat_max)` or an `sf` bbox.
+
+## Point queries (tibble output)
+
+```{r}
+pt <- hwsd_extract(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "~/data/HWSD2"
+)
+```
+
+Multiple points can be provided as a data frame:
+
+```{r}
+sites <- data.frame(
+  lon = c(110, 112.5),
+  lat = c(40, 34.5)
+)
+pt_multi <- hwsd_extract(
+  coords = sites,
+  param = "SAND",
+  layer = "D1",
+  ws_path = "~/data/HWSD2"
+)
+pt_multi
+```
+
+## Dominant vs. composed values
+
+The HWSD manual notes that an SMU may contain multiple soil components. There are two common ways to summarize them:
+
+- **Dominant** values represent the dominant component (sequence 1, then largest share).
+- **Composed** values use component shares to compute weighted summaries.
+
+`hwsd_extract()` uses the dominant component by default. This is consistent with many legacy workflows and avoids misleading averages when a small share has an extreme value. If you need a share-weighted summary, use `hwsd_compose()` with rules from `hwsd_props()`.
+
+Dominant selection logic:
+
+- Prefer `SEQUENCE = 1` if present
+- Within `SEQUENCE = 1`, pick the largest `SHARE`
+- If no `SEQUENCE = 1` exists, pick the largest `SHARE`
+
+### Default share-weighted synthesis
+
+`hwsd_extract()` returns dominant-component values by default. For share-weighted
+composition, use `hwsd_compose()` with rules from `hwsd_props()`:
+
+```{r}
+props <- hwsd_props()
+pt_syn <- hwsd_compose(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "~/data/HWSD2",
+  props = props
+)
+```
+
+Default aggregation rules (from `hwsd_props()`):
+
+- Numeric fields use `weighted_mean`
+- Categorical fields use `weighted_mode`
+- ID-like fields are `drop`
+- Numeric outputs are rounded to the `precision` step
+
+Negative numeric values are treated as missing, and shares are normalized if they do not sum to 100.
+
+### Per-variable aggregation rules
+
+You can override aggregation on a per-variable basis. For example, keep pH as dominant while
+averaging textures:
+
+```{r}
+props <- hwsd_props()
+props$agg[props$property == "PH_WATER"] <- "dominant"
+
+pt_mixed <- hwsd_compose(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "~/data/HWSD2",
+  props = props
+)
+```
+
+You can also pass a named vector for quick overrides:
+
+```{r}
+agg <- c(PH_WATER = "dominant", SAND = "weighted_mean")
+pt_named <- hwsd_compose(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "~/data/HWSD2",
+  props = agg
+)
+```
+
+`hwsd_extract(props = ...)` is equivalent to `hwsd_compose()` and can be used to keep a single
+entry point:
+
+```{r}
+props <- hwsd_props()
+props$agg[props$property == "PH_WATER"] <- "dominant"
+pt_syn2 <- hwsd_extract(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "~/data/HWSD2",
+  props = props
+)
+```
+
+## Bounding box queries (SpatRaster)
+
+For large areas, enable tiling to improve performance:
+
+```{r}
+sand_cn <- hwsd_extract(
+  bbox = c(70, 18, 140, 54),
+  param = "SAND",
+  layer = "D1",
+  ws_path = "~/data/HWSD2",
+  tiles_deg = 5,
+  cores = 4
+)
+```
+
+Regional extraction notes:
+
+- Bbox queries return a `terra::SpatRaster`; point queries return a tibble.
+- Use `internal = FALSE` to write GeoTIFFs to disk (returns the output path).
+- On Windows, `cores` falls back to sequential processing (parallel is used on non-Windows).
+- If you need categorical rasters (e.g., `DRAINAGE`), request them explicitly rather than using `param = "ALL"`.
+
+## Working across layers
+
+Use `output = "long"` when extracting multiple layers at once:
+
+```{r}
+pt_layers <- hwsd_extract(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = c("D1", "D2", "D3"),
+  ws_path = "~/data/HWSD2",
+  output = "long"
+)
+```
+
+### Categorical Data (e.g. Drainage)
+
+Categorical parameters are automatically converted to factor rasters with a built-in Raster Attribute Table (RAT), so you see meaningful labels instead of integers:
+
+```{r}
+drainage_cn <- hwsd_extract(
+  bbox = c(108, 30, 112, 34),
+  param = "DRAINAGE",
+  layer = "D1",
+  ws_path = "~/data/HWSD2"
+)
+terra::plot(drainage_cn, main = "Drainage Class")
+```
+
+## Data quality and scale
+
+The manual emphasizes that HWSD v2.0 is a global product assembled from multiple sources with varying scales and survey methods. It is well-suited for regional and global modeling, but for national or local studies, national harmonized soil databases are preferred when available. Use dominant vs. composed summaries consciously, especially when a small component has extreme values.
+
+## Plotting with ggplot2
+
+This section uses ggplot2 and tidyterra.
+
+```{r}
+library(ggplot2)
+library(tidyterra)
+ggplot() +
+  tidyterra::geom_spatraster(data = sand_cn)
+```
+
+## Discover available properties
+
+```{r}
+hwsd_props()
+```

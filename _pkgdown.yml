@@ -8,6 +8,25 @@ navbar:
   structure:
     left:  [home, reference, articles]
     right: [github]
+  components:
+    articles:
+      text: Articles
+      menu:
+        - text: Getting started
+          href: articles/tidyhwsd.html
+        - text: Full tutorial
+          href: articles/tutorial.html
+        - text: Units and aggregation
+          href: articles/units-and-aggregation.html
+
+articles:
+  - title: Getting Started
+    contents:
+      - tidyhwsd
+  - title: Tutorials
+    contents:
+      - tutorial
+      - units-and-aggregation
 
 reference:
   - title: Core

@@ -42,8 +42,7 @@ pt_syn <- hwsd_compose(
 
 ## Notes
 
-- Full tutorial and examples: https://rimagination.github.io/tidyhwsd/articles/tidyhwsd.html
-- Units and aggregation guide: https://rimagination.github.io/tidyhwsd/articles/units-and-aggregation.html
+- More tutorials and documentation: https://rimagination.github.io/tidyhwsd
 - Set `WS_PATH` in `~/.Renviron` to avoid passing `ws_path` every time.
 - If downloads are slow, manually download and extract the grid zip so `HWSD2.bil` exists:
   https://s3.eu-west-1.amazonaws.com/data.gaezdev.aws.fao.org/HWSD/HWSD2_RASTER.zip

@@ -1,8 +1,8 @@
 test_that("point extract works with tiny mock grid", {
   skip_on_cran()
   tmp <- tempdir()
-  # create a 1x1 raster with a valid SMU_ID from hwsd2
-  id <- tidyhwsd::hwsd2$HWSD2_SMU_ID[1]
+  # create a 1x1 raster with a valid SMU_ID from hwsd2_layers
+  id <- tidyhwsd::hwsd2_layers$HWSD2_SMU_ID[1]
   r <- terra::rast(nrows = 1, ncols = 1, xmin = 0, xmax = 1, ymin = 0, ymax = 1, crs = "EPSG:4326")
   terra::values(r) <- id
   terra::writeRaster(r,
@@ -11,11 +11,11 @@ test_that("point extract works with tiny mock grid", {
     overwrite = TRUE
   )
 
-  num_cols <- names(tidyhwsd::hwsd2)[vapply(tidyhwsd::hwsd2, is.numeric, logical(1))]
+  num_cols <- names(tidyhwsd::hwsd2_layers)[vapply(tidyhwsd::hwsd2_layers, is.numeric, logical(1))]
   res <- hwsd_extract(
     coords = c(0.5, 0.5),
     param = num_cols[1],
-    layer = tidyhwsd::hwsd2$LAYER[1],
+    layer = tidyhwsd::hwsd2_layers$LAYER[1],
     ws_path = tmp
   )
 
@@ -29,7 +29,7 @@ test_that("point extract works with tiny mock grid", {
 test_that("bbox extract returns SpatRaster", {
   skip_on_cran()
   tmp <- tempdir()
-  id <- tidyhwsd::hwsd2$HWSD2_SMU_ID[1]
+  id <- tidyhwsd::hwsd2_layers$HWSD2_SMU_ID[1]
   r <- terra::rast(nrows = 1, ncols = 1, xmin = 0, xmax = 1, ymin = 0, ymax = 1, crs = "EPSG:4326")
   terra::values(r) <- id
   terra::writeRaster(r,
@@ -38,12 +38,12 @@ test_that("bbox extract returns SpatRaster", {
     overwrite = TRUE
   )
 
-  num_cols <- names(tidyhwsd::hwsd2)[vapply(tidyhwsd::hwsd2, is.numeric, logical(1))]
+  num_cols <- names(tidyhwsd::hwsd2_layers)[vapply(tidyhwsd::hwsd2_layers, is.numeric, logical(1))]
 
   res <- hwsd_extract(
     bbox = c(0, 0, 1, 1),
     param = num_cols[1],
-    layer = tidyhwsd::hwsd2$LAYER[1],
+    layer = tidyhwsd::hwsd2_layers$LAYER[1],
     ws_path = tmp
   )
 
@@ -53,7 +53,7 @@ test_that("bbox extract returns SpatRaster", {
 test_that("data.frame multi-point input works", {
   skip_on_cran()
   tmp <- tempdir()
-  id <- tidyhwsd::hwsd2$HWSD2_SMU_ID[1]
+  id <- tidyhwsd::hwsd2_layers$HWSD2_SMU_ID[1]
   r <- terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 2, ymin = 0, ymax = 2, crs = "EPSG:4326")
   terra::values(r) <- id
   terra::writeRaster(r,
@@ -62,14 +62,14 @@ test_that("data.frame multi-point input works", {
     overwrite = TRUE
   )
 
-  num_cols <- names(tidyhwsd::hwsd2)[vapply(tidyhwsd::hwsd2, is.numeric, logical(1))]
+  num_cols <- names(tidyhwsd::hwsd2_layers)[vapply(tidyhwsd::hwsd2_layers, is.numeric, logical(1))]
 
   # Test with data.frame input
   sites <- data.frame(lon = c(0.5, 1.5), lat = c(0.5, 1.5))
   res <- hwsd_extract(
     coords = sites,
     param = num_cols[1],
-    layer = tidyhwsd::hwsd2$LAYER[1],
+    layer = tidyhwsd::hwsd2_layers$LAYER[1],
     ws_path = tmp
   )
 
@@ -91,12 +91,12 @@ test_that("ocean/invalid coordinates return NA", {
     overwrite = TRUE
   )
 
-  num_cols <- names(tidyhwsd::hwsd2)[vapply(tidyhwsd::hwsd2, is.numeric, logical(1))]
+  num_cols <- names(tidyhwsd::hwsd2_layers)[vapply(tidyhwsd::hwsd2_layers, is.numeric, logical(1))]
 
   res <- hwsd_extract(
     coords = c(1, 1),
     param = num_cols[1],
-    layer = tidyhwsd::hwsd2$LAYER[1],
+    layer = tidyhwsd::hwsd2_layers$LAYER[1],
     ws_path = tmp
   )
 
@@ -127,4 +127,34 @@ test_that("input validation errors work correctly", {
     hwsd_extract(coords = c(1, 2, 3)),
     "length 2"
   )
+})
+
+test_that("compose respects agg rules", {
+  skip_on_cran()
+  tmp <- tempdir()
+  id <- tidyhwsd::hwsd2_layers$HWSD2_SMU_ID[1]
+  r <- terra::rast(nrows = 1, ncols = 1, xmin = 0, xmax = 1, ymin = 0, ymax = 1, crs = "EPSG:4326")
+  terra::values(r) <- id
+  terra::writeRaster(r,
+    filename = file.path(tmp, "HWSD2.bil"),
+    filetype = "ENVI",
+    overwrite = TRUE
+  )
+
+  props <- hwsd_props()
+  # Ensure at least one numeric column is selected
+  num_cols <- names(tidyhwsd::hwsd2_layers)[vapply(tidyhwsd::hwsd2_layers, is.numeric, logical(1))]
+  target <- num_cols[1]
+  props$agg[props$property == target] <- "dominant"
+
+  res <- hwsd_extract(
+    coords = c(0.5, 0.5),
+    param = target,
+    layer = tidyhwsd::hwsd2_layers$LAYER[1],
+    ws_path = tmp,
+    props = props
+  )
+
+  expect_s3_class(res, "tbl_df")
+  expect_equal(nrow(res), 1)
 })

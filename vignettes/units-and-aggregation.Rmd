@@ -1,0 +1,93 @@
+---
+title: "HWSD v2.0 units and aggregation"
+author: "tidyhwsd authors"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{HWSD v2.0 units and aggregation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+library(tidyhwsd)
+```
+
+## Data model (from the HWSD v2.0 manual)
+
+HWSD v2.0 stores soil information per soil mapping unit (SMU). Each SMU can have
+up to 12 components, with:
+
+- **SEQUENCE**: order of components (sequence 1 is dominant)
+- **SHARE**: percent share, summed to 100 within an SMU
+- **LAYER**: D1 to D7 depth layers
+
+`hwsd2_layers` is the component table; `hwsd_extract()` and `hwsd_compose()` map
+SMU IDs to attributes using these fields.
+
+## Units and codes
+
+`hwsd_props()` provides a description and default aggregation rule for each
+property, plus a `precision` field that encodes the rounding step used after
+aggregation.
+
+Common units (from the manual and field definitions):
+
+- **Depth**: `TOPDEP`, `BOTDEP` in cm (D1 = 0-20 cm; ...; D7 = 150-200 cm)
+- **Texture**: `SAND`, `SILT`, `CLAY` in percent by weight
+- **Bulk density**: `BULK`, `REF_BULK` in g/cm3
+- **Organic carbon**: `ORG_CARBON` in percent by weight
+- **pH**: `PH_WATER` in water (-log(H+))
+- **Total nitrogen**: `TOTAL_N` in g/kg
+- **CEC / ECEC / TEB**: cmol/kg
+- **Electrical conductivity**: `ELEC_COND` in dS/m
+- **AWC**: `AWC` in mm/m (see manual table on USDA texture classes)
+
+Code fields:
+
+- `ROOT_DEPTH` is a **class code** (1-4; deep to very shallow)
+- `ROOTS`, `IL`, `SWR` are **class codes** (see manual)
+- `DRAINAGE` is a categorical class
+
+## Aggregation behavior
+
+`hwsd_extract()` returns **dominant component** values:
+
+- SEQUENCE = 1 is preferred
+- within SEQUENCE = 1, the largest SHARE is chosen
+- if no SEQUENCE = 1 exists, the largest SHARE is chosen
+
+`hwsd_compose()` performs **share-weighted synthesis** using rules from
+`hwsd_props()`:
+
+- numeric fields: `weighted_mean`
+- categorical fields: `weighted_mode`
+- ID-like fields: `drop`
+- numeric outputs are rounded to the `precision` step
+
+Example:
+
+```{r}
+props <- hwsd_props()
+props$agg[props$property == "PH_WATER"] <- "dominant"
+
+pt_dom <- hwsd_extract(
+  coords = c(110, 40),
+  param = c("PH_WATER", "SAND"),
+  layer = "D1",
+  ws_path = "D:/data/HWSD2"
+)
+
+pt_syn <- hwsd_compose(
+  coords = c(110, 40),
+  param = c("PH_WATER", "SAND"),
+  layer = "D1",
+  ws_path = "D:/data/HWSD2",
+  props = props
+)
+```

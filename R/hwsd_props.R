@@ -1,17 +1,24 @@
 #' List available HWSD v2.0 properties
 #'
-#' Returns a tibble of property names present in the bundled \code{hwsd2} table,
-#' with type info and short descriptions to help selection.
+#' Returns a tibble of property names present in the bundled \code{hwsd2_layers}
+#' component table, with type info, descriptions, default aggregation rules, and
+#' rounding precision. The \code{agg} and \code{precision} columns are meant to be
+#' edited and passed into \code{hwsd_compose()} or \code{hwsd_extract(props = ...)}.
 #'
-#' @return tibble with columns \code{property}, \code{type}, \code{description}
+#' @return tibble with columns \code{property}, \code{type}, \code{description},
+#'   \code{agg} (default aggregation method), and \code{precision} (rounding step).
 #' @export
 #' @examples
-#' hwsd_props()
+#' props <- hwsd_props()
+#' head(props)
+#'
+#' # Override aggregation rule for one variable
+#' props$agg[props$property == "PH_WATER"] <- "dominant"
 hwsd_props <- function() {
-  if (is.null(.tidyhwsd_cache$hwsd2)) {
-    .tidyhwsd_cache$hwsd2 <- tidyhwsd::hwsd2
+  if (is.null(.tidyhwsd_cache$hwsd2_layers)) {
+    .tidyhwsd_cache$hwsd2_layers <- tidyhwsd::hwsd2_layers
   }
-  hwsd2 <- .tidyhwsd_cache$hwsd2
+  hwsd2_layers <- .tidyhwsd_cache$hwsd2_layers
 
   # Property descriptions based on HWSD v2.0 documentation
   descriptions <- c(
@@ -29,12 +36,12 @@ hwsd_props <- function() {
     WRB4 = "WRB 4th edition classification",
     WRB2 = "WRB 2nd edition classification",
     FAO90 = "FAO90 soil classification",
-    ROOT_DEPTH = "Reference depth for rooting (cm)",
+    ROOT_DEPTH = "Rootable soil depth class (1-4)",
     PHASE1 = "Soil phase 1",
     PHASE2 = "Soil phase 2",
-    ROOTS = "Obstacles to roots",
-    IL = "Impermeable layer presence",
-    SWR = "Soil water regime",
+    ROOTS = "Obstacles to roots (class code)",
+    IL = "Impermeable layer (class code)",
+    SWR = "Soil water regime (class code)",
     DRAINAGE = "Drainage class",
     AWC = "Available water capacity (mm/m)",
     ADD_PROP = "Additional properties",
@@ -50,8 +57,8 @@ hwsd_props <- function() {
     BULK = "Bulk density (g/cm3)",
     REF_BULK = "Reference bulk density (g/cm3)",
     ORG_CARBON = "Organic carbon (%wt)",
-    PH_WATER = "pH in water",
-    TOTAL_N = "Total nitrogen (%wt)",
+    PH_WATER = "pH in water (-log(H+))",
+    TOTAL_N = "Total nitrogen (g/kg)",
     CN_RATIO = "Carbon to nitrogen ratio",
     CEC_SOIL = "CEC of whole soil (cmol/kg)",
     CEC_CLAY = "CEC of clay fraction (cmol/kg)",
@@ -65,8 +72,34 @@ hwsd_props <- function() {
     ELEC_COND = "Electrical conductivity (dS/m)"
   )
 
-  props <- setdiff(names(hwsd2), c("HWSD2_SMU_ID", "LAYER"))
-  types <- vapply(hwsd2[props], function(x) class(x)[1], character(1))
+  props <- setdiff(names(hwsd2_layers), c("HWSD2_SMU_ID", "LAYER"))
+  types <- vapply(hwsd2_layers[props], function(x) class(x)[1], character(1))
+
+  drop_vars <- c(
+    "ID", "HWSD2_SMU_ID", "HWSD1_SMU_ID", "WISE30s_SMU_ID",
+    "LAYER", "SEQUENCE", "SHARE"
+  )
+  source_vars <- grep("SOURCE", names(hwsd2_layers), value = TRUE)
+  categorical_vars <- c(
+    "WRB_PHASES", "WRB4", "WRB2", "FAO90",
+    "DRAINAGE", "TEXTURE_USDA", "TEXTURE_SOTER",
+    "NSC", "PHASE1", "PHASE2", "ROOTS", "IL", "SWR", "ADD_PROP",
+    "COVERAGE",
+    source_vars
+  )
+
+  agg <- rep("weighted_mean", length(props))
+  agg[types %in% c("character", "factor")] <- "weighted_mode"
+  agg[props %in% categorical_vars] <- "weighted_mode"
+  agg[props %in% drop_vars] <- "drop"
+
+  precision <- rep(NA_real_, length(props))
+  precision[types %in% c("numeric", "integer")] <- 1
+  precision[props %in% c("PH_WATER")] <- 0.1
+  precision[props %in% c("TOTAL_N")] <- 0.01
+  precision[props %in% c("ORG_CARBON")] <- 0.001
+  precision[props %in% c("BULK", "REF_BULK")] <- 0.05
+  precision[props %in% c("TCARBON_EQ", "GYPSUM")] <- 0.1
 
   # Match descriptions
   desc <- descriptions[props]
@@ -75,6 +108,8 @@ hwsd_props <- function() {
   tibble::tibble(
     property = props,
     type = types,
-    description = as.character(desc)
+    description = as.character(desc),
+    agg = agg,
+    precision = precision
   )
 }

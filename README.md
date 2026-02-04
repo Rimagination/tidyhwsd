@@ -1,6 +1,20 @@
 # tidyhwsd
 
+<img src="man/figures/logo.png" align="right" width="140" alt="tidyhwsd logo" />
+
 Tidyverse-friendly access to the Harmonized World Soil Database (HWSD) v2.0.
+
+Website: https://rimagination.github.io/tidyhwsd
+
+## Motivation & Rationale
+
+HWSD 2.0 is a component-based soil association dataset: a single SMU x layer can
+contain multiple components, each with a SEQUENCE and SHARE. The previous
+pre-collapsed table obscured this structure and forced implicit choices (e.g.,
+dominant-only). This version uses the component table as the single source of
+truth and exposes explicit aggregation options (dominant vs. share-weighted,
+categorical mode vs. distribution). Defaults remain reasonable and compatible
+with prior behavior, while enabling transparent, configurable analysis.
 
 ## Installation
 
@@ -18,13 +32,25 @@ library(tidyhwsd)
 hwsd_download(ws_path = "~/data/HWSD2", verbose = TRUE)
 ```
 
-2) Point query. Returns a tibble.
+2) Point query. Returns dominant component values.
 ```r
 pt <- hwsd_extract(
   coords = c(110, 40),
   param = c("SAND", "PH_WATER"),
   layer = "D1",
   ws_path = "~/data/HWSD2"
+)
+```
+
+Optional: share-weighted synthesis with per-variable rules:
+```r
+props <- hwsd_props()
+pt_syn <- hwsd_compose(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "~/data/HWSD2",
+  props = props
 )
 ```
 
@@ -71,7 +97,6 @@ terra::plot(drainage)
 5) Discover available properties:
 ```r
 hwsd_props()
-head(names(hwsd2))
 ```
 
 ## Environment Variable
@@ -93,4 +118,3 @@ library(ggplot2)
 library(tidyterra)
 ggplot() + tidyterra::geom_spatraster(data = sand)
 ```
-

@@ -7,12 +7,19 @@
 hwsd_props()
 }
 \value{
-tibble with columns \code{property}, \code{type}, \code{description}
+tibble with columns \code{property}, \code{type}, \code{description},
+\code{agg} (default aggregation method), and \code{precision} (rounding step).
 }
 \description{
-Returns a tibble of property names present in the bundled \code{hwsd2} table,
-with type info and short descriptions to help selection.
+Returns a tibble of property names present in the bundled \code{hwsd2_layers}
+component table, with type info, descriptions, default aggregation rules, and
+rounding precision. The \code{agg} and \code{precision} columns are meant to be
+edited and passed into \code{hwsd_compose()} or \code{hwsd_extract(props = ...)}.
 }
 \examples{
-hwsd_props()
+props <- hwsd_props()
+head(props)
+
+# Override aggregation rule for one variable
+props$agg[props$property == "PH_WATER"] <- "dominant"
 }

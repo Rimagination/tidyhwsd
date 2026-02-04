@@ -7,6 +7,10 @@
 #' @param verbose Show progress messages.
 #' @return The path used.
 #' @export
+#' @examples
+#' \dontrun{
+#' hwsd_download(ws_path = "D:/data/HWSD2", verbose = TRUE)
+#' }
 hwsd_download <- function(
   ws_path = file.path(tempdir(), "ws_db"),
   verbose = FALSE

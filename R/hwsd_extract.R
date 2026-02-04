@@ -1,11 +1,11 @@
-#' Extract HWSD v2.0 attributes (point or bbox)
+#' Extract HWSD v2.0 attributes (dominant component)
 #'
-#' @param location A point c(lon, lat) or bbox c(lon_min, lat_min, lon_max, lat_max);
-#'   `sf` bbox objects are also accepted.
+#' @param coords A point c(lon, lat), matrix (2 cols), or data.frame with lon/lat.
+#' @param bbox A bbox c(lon_min, lat_min, lon_max, lat_max); `sf` bbox also accepted.
 #' @param param Character vector of property names; `"ALL"` selects all available
-#'   attributes. For `bbox` queries, non-numeric columns are automatically converted
-#'   to factors in the resulting raster.
-#' @param layer Soil layer code ("D1"–"D7").
+#'   attributes. For `bbox` queries, non-numeric columns are automatically dropped
+#'   when `param = "ALL"`.
+#' @param layer Soil layer code ("D1"-"D7"). For `bbox`, must be length 1.
 #' @param path Output path when writing raster (used if `internal = FALSE`).
 #' @param ws_path Path to HWSD index grid; will be downloaded if missing.
 #' @param internal If `TRUE`, return in-memory raster; if `FALSE`, write to `path`.
@@ -13,8 +13,40 @@
 #'   smaller than extent, tiles are processed and mosaicked.
 #' @param cores Number of cores for tiling (uses `parallel::mclapply` on non-Windows).
 #' @param verbose Show progress messages.
-#' @return Tibble with columns `lon`, `lat`, and one column per requested parameter (Wide Format) for point queries;
-#'   `terra::SpatRaster` (or file path if `internal=FALSE`) for bbox queries.
+#' @param props Optional aggregation spec (from `hwsd_props()`). If provided,
+#'   `hwsd_extract()` will synthesize results using those rules (equivalent to
+#'   `hwsd_compose()`). If a `precision` column is present, it will be used to
+#'   round numeric outputs.
+#' @param output Output shape for point queries: `"wide"` or `"long"`.
+#' @return Tibble with columns `lon`, `lat`, and one column per requested parameter
+#'   (wide) or long table for point queries; `terra::SpatRaster` (or file path if
+#'   `internal=FALSE`) for bbox queries.
+#'
+#' @details
+#' Dominant component selection follows: prefer SEQUENCE = 1 if present; within
+#' SEQUENCE = 1 choose the largest SHARE; if no SEQUENCE = 1 exists, choose the
+#' largest SHARE (ties break by smallest SEQUENCE when available).
+#' For share-weighted synthesis, use \code{hwsd_compose()}.
+#' @examples
+#' \dontrun{
+#' # Dominant component (default behavior)
+#' pt <- hwsd_extract(
+#'   coords = c(110, 40),
+#'   param = c("SAND", "PH_WATER"),
+#'   layer = "D1",
+#'   ws_path = "D:/data/HWSD2"
+#' )
+#'
+#' # Share-weighted synthesis using default rules
+#' props <- hwsd_props()
+#' pt_syn <- hwsd_compose(
+#'   coords = c(110, 40),
+#'   param = c("SAND", "PH_WATER"),
+#'   layer = "D1",
+#'   ws_path = "D:/data/HWSD2",
+#'   props = props
+#' )
+#' }
 #' @export
 hwsd_extract <- function(
   coords = NULL,
@@ -26,8 +58,203 @@ hwsd_extract <- function(
   internal = TRUE,
   tiles_deg = Inf,
   cores = 1,
-  verbose = FALSE
+  verbose = FALSE,
+  props = NULL,
+  output = "wide"
 ) {
+  output <- match.arg(output, c("wide", "long"))
+
+  if (!is.null(props)) {
+    return(hwsd_compose(
+      coords = coords,
+      bbox = bbox,
+      param = param,
+      layer = layer,
+      path = path,
+      ws_path = ws_path,
+      internal = internal,
+      tiles_deg = tiles_deg,
+      cores = cores,
+      verbose = verbose,
+      props = props,
+      output = output
+    ))
+  }
+
+  .hwsd_extract_impl(
+    coords = coords,
+    bbox = bbox,
+    param = param,
+    layer = layer,
+    path = path,
+    ws_path = ws_path,
+    internal = internal,
+    tiles_deg = tiles_deg,
+    cores = cores,
+    verbose = verbose,
+    agg_spec = NULL,
+    precision = NULL,
+    dominant_by = "seq1_then_share",
+    normalize_share = TRUE,
+    share_tol = 1,
+    output = output
+  )
+}
+
+#' Synthesize HWSD v2.0 attributes using per-variable aggregation rules
+#'
+#' @inheritParams hwsd_extract
+#' @param props A tibble/data.frame from \code{hwsd_props()} (or a named vector of
+#'   aggregation methods). Modify the \code{agg} column to control synthesis. If a
+#'   \code{precision} column is present, it is used to round numeric outputs.
+#' @return Same as \code{hwsd_extract()}.
+#' @examples
+#' \dontrun{
+#' props <- hwsd_props()
+#' # Share-weighted synthesis with default rules
+#' pt_syn <- hwsd_compose(
+#'   coords = c(110, 40),
+#'   param = c("SAND", "PH_WATER"),
+#'   layer = "D1",
+#'   ws_path = "D:/data/HWSD2",
+#'   props = props
+#' )
+#' }
+#' @export
+hwsd_compose <- function(
+  coords = NULL,
+  bbox = NULL,
+  param = "ALL",
+  layer = "D1",
+  path = tempdir(),
+  ws_path = file.path(tempdir(), "ws_db"),
+  internal = TRUE,
+  tiles_deg = Inf,
+  cores = 1,
+  verbose = FALSE,
+  props = hwsd_props(),
+  output = "wide"
+) {
+  output <- match.arg(output, c("wide", "long"))
+
+  spec <- .resolve_agg_spec(props, param)
+
+  .hwsd_extract_impl(
+    coords = coords,
+    bbox = bbox,
+    param = spec$param,
+    layer = layer,
+    path = path,
+    ws_path = ws_path,
+    internal = internal,
+    tiles_deg = tiles_deg,
+    cores = cores,
+    verbose = verbose,
+    agg_spec = spec$agg_spec,
+    precision = spec$precision,
+    dominant_by = "seq1_then_share",
+    normalize_share = TRUE,
+    share_tol = 1,
+    output = output
+  )
+}
+
+.resolve_agg_spec <- function(props, param) {
+  if (is.null(props)) {
+    props <- hwsd_props()
+  }
+
+  if (is.vector(props) && !is.list(props)) {
+    if (is.null(names(props))) {
+      cli::cli_abort("`props` must be a named vector or a data.frame with columns 'property' and 'agg'.")
+    }
+    props_df <- data.frame(
+      property = names(props),
+      agg = as.character(props),
+      stringsAsFactors = FALSE
+    )
+  } else if (is.data.frame(props)) {
+    if (!all(c("property", "agg") %in% names(props))) {
+      cli::cli_abort("`props` must contain columns 'property' and 'agg'.")
+    }
+    cols <- c("property", "agg")
+    if ("precision" %in% names(props)) {
+      cols <- c(cols, "precision")
+    }
+    props_df <- props[, cols]
+  } else {
+    cli::cli_abort("`props` must be a named vector or a data.frame with columns 'property' and 'agg'.")
+  }
+
+  props_df$property <- as.character(props_df$property)
+  props_df$agg <- as.character(props_df$agg)
+
+  valid_methods <- c("dominant", "weighted_mean", "weighted_mode", "drop")
+  if (any(!props_df$agg %in% valid_methods & !is.na(props_df$agg))) {
+    bad <- unique(props_df$agg[!props_df$agg %in% valid_methods & !is.na(props_df$agg)])
+    cli::cli_abort("Invalid aggregation method(s) in `props`: {bad}.")
+  }
+
+  request_all <- any(tolower(param) == "all")
+  if (request_all) {
+    param_use <- props_df$property[!is.na(props_df$agg) & props_df$agg != "drop"]
+  } else {
+    param_use <- param
+  }
+
+  missing <- setdiff(param_use, props_df$property)
+  if (length(missing) > 0) {
+    cli::cli_abort("Properties not found in `props`: {missing}.")
+  }
+
+  agg_spec <- props_df$agg[match(param_use, props_df$property)]
+  names(agg_spec) <- param_use
+
+  precision <- NULL
+  if ("precision" %in% names(props_df)) {
+    precision <- props_df$precision[match(param_use, props_df$property)]
+    names(precision) <- param_use
+  }
+
+  drop_idx <- is.na(agg_spec) | agg_spec == "drop"
+  if (any(drop_idx)) {
+    dropped <- names(agg_spec)[drop_idx]
+    agg_spec <- agg_spec[!drop_idx]
+    param_use <- param_use[!drop_idx]
+    if (!is.null(precision)) {
+      precision <- precision[!drop_idx]
+    }
+    if (length(dropped) > 0) {
+      cli::cli_warn("Dropping fields with agg='drop': {dropped}.")
+    }
+  }
+
+  if (length(param_use) == 0) {
+    cli::cli_abort("No valid parameters after applying aggregation rules.")
+  }
+
+  list(param = param_use, agg_spec = agg_spec, precision = precision)
+}
+
+.hwsd_extract_impl <- function(
+  coords = NULL,
+  bbox = NULL,
+  param = "ALL",
+  layer = "D1",
+  path = tempdir(),
+  ws_path = file.path(tempdir(), "ws_db"),
+  internal = TRUE,
+  tiles_deg = Inf,
+  cores = 1,
+  verbose = FALSE,
+  agg_spec = NULL,
+  precision = NULL,
+  dominant_by = "seq1_then_share",
+  normalize_share = TRUE,
+  share_tol = 1,
+  output = "wide"
+) {
+
   # handle input modes
   if (!is.null(coords) && !is.null(bbox)) {
     cli::cli_abort("Provide either `coords` or `bbox`, not both.")
@@ -74,6 +301,10 @@ hwsd_extract <- function(
     mode <- "bbox"
   }
 
+  if (length(layer) != 1 && (mode == "bbox" || output == "wide")) {
+    cli::cli_abort("`layer` must be length 1 for bbox or wide output. Use `output = 'long'` for multiple layers.")
+  }
+
   # ensure grid exists
   grid_bil <- file.path(ws_path, "HWSD2.bil")
   grid_tif <- file.path(ws_path, "HWSD2.tif")
@@ -89,25 +320,24 @@ hwsd_extract <- function(
     names(ids_rast) <- "HWSD2"
   }
 
-  # load and cache attribute table
-  if (is.null(.tidyhwsd_cache$hwsd2)) {
-    .tidyhwsd_cache$hwsd2 <- tidyhwsd::hwsd2
+  # load and cache component table
+  if (is.null(.tidyhwsd_cache$hwsd2_layers)) {
+    .tidyhwsd_cache$hwsd2_layers <- tidyhwsd::hwsd2_layers
   }
-  hwsd2 <- .tidyhwsd_cache$hwsd2 |>
-    dplyr::filter(LAYER == layer)
+  hwsd2_layers <- .tidyhwsd_cache$hwsd2_layers
 
-  available <- names(hwsd2)
+  available <- names(hwsd2_layers)
   request_all <- any(tolower(param) == "all")
 
   if (request_all) {
-    param <- available[!available %in% c("HWSD2_SMU_ID", "LAYER")]
+    param <- setdiff(available, c("HWSD2_SMU_ID", "LAYER", "SEQUENCE", "SHARE"))
   }
 
   if (mode == "bbox" && request_all) {
     param <- param[
       vapply(
         param,
-        function(par) is.numeric(hwsd2[[par]]),
+        function(par) is.numeric(hwsd2_layers[[par]]),
         logical(1)
       )
     ]
@@ -119,6 +349,40 @@ hwsd_extract <- function(
 
   if (any(!(param %in% available))) {
     cli::cli_abort("One or more soil parameters are not valid for HWSD v2.0.")
+  }
+
+  needed_cols <- unique(c("HWSD2_SMU_ID", "LAYER", "SEQUENCE", "SHARE", param))
+  needed_cols <- intersect(available, needed_cols)
+
+  collapse_fun <- if (is.null(agg_spec)) {
+    function(df) collapse_group_dominant(df, dominant_by = dominant_by)
+  } else {
+    function(df) collapse_group_spec(
+      df,
+      agg_spec = agg_spec,
+      dominant_by = dominant_by,
+      normalize_share = normalize_share,
+      share_tol = share_tol
+    )
+  }
+
+  apply_precision <- function(df) {
+    if (is.null(precision) || length(precision) == 0) {
+      return(df)
+    }
+    for (col in names(precision)) {
+      if (!col %in% names(df)) {
+        next
+      }
+      step <- precision[[col]]
+      if (!is.finite(step) || is.na(step) || step <= 0) {
+        next
+      }
+      if (is.numeric(df[[col]])) {
+        df[[col]] <- round(df[[col]] / step) * step
+      }
+    }
+    df
   }
 
   # tiling for large bbox
@@ -139,7 +403,7 @@ hwsd_extract <- function(
 
     tile_fun <- function(row_id) {
       tile <- tiles[row_id, ]
-      hwsd_extract(
+      .hwsd_extract_impl(
         bbox = c(
           xbreaks[tile$ix],
           ybreaks[tile$iy],
@@ -153,7 +417,12 @@ hwsd_extract <- function(
         internal = TRUE,
         tiles_deg = Inf,
         cores = 1,
-        verbose = verbose
+        verbose = verbose,
+        agg_spec = agg_spec,
+        dominant_by = dominant_by,
+        normalize_share = normalize_share,
+        share_tol = share_tol,
+        output = "wide"
       )
     }
 
@@ -169,8 +438,6 @@ hwsd_extract <- function(
     # Restore factor levels from the first tile (encoding is global)
     if (length(rasters) > 0) {
       r1 <- rasters[[1]]
-      # levels(r) <- val expects a list of data.frames (one per layer) or NULLs
-      # terra::levels(r1) returns exactly that structure
       levels(mosaic) <- terra::levels(r1)
     }
 
@@ -185,7 +452,6 @@ hwsd_extract <- function(
 
   # point workflow (single or multiple)
   if (mode == "point") {
-    # reuse coords_df constructed above
     if (!exists("coords_df")) {
       coords_df <- data.frame(lon = location[1], lat = location[2])
     }
@@ -205,32 +471,42 @@ hwsd_extract <- function(
       smu_ids <- as.vector(pixel_vals)
     }
 
-    # Vectorized match
-    match_idx <- match(smu_ids, hwsd2$HWSD2_SMU_ID)
+    coords_df$HWSD2_SMU_ID <- smu_ids
 
-    # Pre-allocate result with coordinates
-    res <- coords_df
+    unique_ids <- unique(smu_ids)
+    unique_ids <- unique_ids[!is.na(unique_ids)]
 
-    # Get attributes
-    if (length(param) > 0) {
-      # Subset the data for all matched IDs
-      # For unmatched IDs (NA in match_idx), we get rows of NAs which is correct
-      attrs <- hwsd2[match_idx, param, drop = FALSE]
+    subset_data <- hwsd2_layers |>
+      dplyr::filter(HWSD2_SMU_ID %in% unique_ids, LAYER %in% layer) |>
+      dplyr::select(dplyr::any_of(needed_cols))
 
-      # Clean numeric columns (negative -> NA)
-      for (p in names(attrs)) {
-        if (is.numeric(attrs[[p]])) {
-          col_vals <- attrs[[p]]
-          # Efficiently replace negative values with NA
-          col_vals[col_vals < 0] <- NA
-          attrs[[p]] <- col_vals
-        }
-      }
+    agg <- subset_data |>
+      dplyr::group_by(HWSD2_SMU_ID, LAYER) |>
+      dplyr::group_modify(~ collapse_fun(.x)) |>
+      dplyr::ungroup()
 
-      # Bind attributes to coordinates
-      res <- dplyr::bind_cols(res, attrs)
+    agg <- agg |>
+      dplyr::select(dplyr::any_of(c("HWSD2_SMU_ID", "LAYER", param)))
+    agg <- apply_precision(agg)
+
+    if (output == "long") {
+      res <- dplyr::left_join(coords_df, agg, by = "HWSD2_SMU_ID")
+      return(tibble::as_tibble(res))
     }
 
+    layer_val <- as.character(layer[1])
+    agg_layer <- agg |>
+      dplyr::filter(as.character(LAYER) == layer_val)
+
+    if (nrow(agg_layer) == 0) {
+      attrs <- as.data.frame(matrix(NA, nrow = nrow(coords_df), ncol = length(param)))
+      names(attrs) <- param
+    } else {
+      match_idx <- match(smu_ids, agg_layer$HWSD2_SMU_ID)
+      attrs <- agg_layer[match_idx, param, drop = FALSE]
+    }
+
+    res <- dplyr::bind_cols(coords_df[, c("lon", "lat")], attrs)
     return(tibble::as_tibble(res))
   }
 
@@ -243,26 +519,40 @@ hwsd_extract <- function(
   }
 
   ids_vec <- terra::values(cropped, mat = FALSE)
+  unique_ids <- unique(ids_vec)
+  unique_ids <- unique_ids[!is.na(unique_ids)]
+
+  subset_data <- hwsd2_layers |>
+    dplyr::filter(HWSD2_SMU_ID %in% unique_ids, LAYER %in% layer) |>
+    dplyr::select(dplyr::any_of(needed_cols))
+
+  agg <- subset_data |>
+    dplyr::group_by(HWSD2_SMU_ID, LAYER) |>
+    dplyr::group_modify(~ collapse_fun(.x)) |>
+    dplyr::ungroup()
+
+  agg <- agg |>
+    dplyr::select(dplyr::any_of(c("HWSD2_SMU_ID", "LAYER", param)))
+  agg <- apply_precision(agg)
+
   param_mat <- matrix(NA_real_, nrow = length(ids_vec), ncol = length(param))
   levels_list <- vector("list", length(param))
 
   for (j in seq_along(param)) {
-    column <- hwsd2[[param[j]]]
+    column <- agg[[param[j]]]
 
     if (is.numeric(column)) {
-      # HWSD v2.0 uses negative values for NoData (e.g. -9)
       column[column < 0] <- NA
-      lookup <- stats::setNames(column, hwsd2$HWSD2_SMU_ID)
+      lookup <- stats::setNames(column, agg$HWSD2_SMU_ID)
       param_mat[, j] <- lookup[as.character(ids_vec)]
     } else {
-      # Handle categorical/character data
       f_col <- factor(column)
       levels_list[[j]] <- data.frame(
         id = seq_along(levels(f_col)),
         category = levels(f_col)
       )
       vals <- as.integer(f_col)
-      lookup <- stats::setNames(vals, hwsd2$HWSD2_SMU_ID)
+      lookup <- stats::setNames(vals, agg$HWSD2_SMU_ID)
       param_mat[, j] <- lookup[as.character(ids_vec)]
     }
   }

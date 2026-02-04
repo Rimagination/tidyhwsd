@@ -1,7 +1,7 @@
 Package: tidyhwsd
 Type: Package
 Title: Tidy Interface to HWSD v2.0 Data
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person(given = "Your",
            family = "Name",
@@ -29,6 +29,8 @@ Suggests:
     rmarkdown
 Config/testthat/edition: 3
 VignetteBuilder: knitr
+URL: https://rimagination.github.io/tidyhwsd, https://github.com/Rimagination/tidyhwsd
+BugReports: https://github.com/Rimagination/tidyhwsd/issues
 License: AGPL-3 | file LICENSE
 Encoding: UTF-8
 LazyData: true

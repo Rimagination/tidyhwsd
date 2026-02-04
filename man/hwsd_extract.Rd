@@ -2,7 +2,7 @@
 % Please edit documentation in R/hwsd_extract.R
 \name{hwsd_extract}
 \alias{hwsd_extract}
-\title{Extract HWSD v2.0 attributes (point or bbox)}
+\title{Extract HWSD v2.0 attributes (dominant component)}
 \usage{
 hwsd_extract(
   coords = NULL,
@@ -14,15 +14,21 @@ hwsd_extract(
   internal = TRUE,
   tiles_deg = Inf,
   cores = 1,
-  verbose = FALSE
+  verbose = FALSE,
+  props = NULL,
+  output = "wide"
 )
 }
 \arguments{
-\item{param}{Character vector of property names; \code{"ALL"} selects all available
-attributes. For \code{bbox} queries, non-numeric columns are automatically converted
-to factors in the resulting raster.}
+\item{coords}{A point c(lon, lat), matrix (2 cols), or data.frame with lon/lat.}
 
-\item{layer}{Soil layer code ("D1"–"D7").}
+\item{bbox}{A bbox c(lon_min, lat_min, lon_max, lat_max); \code{sf} bbox also accepted.}
+
+\item{param}{Character vector of property names; \code{"ALL"} selects all available
+attributes. For \code{bbox} queries, non-numeric columns are automatically dropped
+when \code{param = "ALL"}.}
+
+\item{layer}{Soil layer code ("D1"-"D7"). For \code{bbox}, must be length 1.}
 
 \item{path}{Output path when writing raster (used if \code{internal = FALSE}).}
 
@@ -37,12 +43,45 @@ smaller than extent, tiles are processed and mosaicked.}
 
 \item{verbose}{Show progress messages.}
 
-\item{location}{A point c(lon, lat) or bbox c(lon_min, lat_min, lon_max, lat_max);
-\code{sf} bbox objects are also accepted.}
+\item{props}{Optional aggregation spec (from \code{hwsd_props()}). If provided,
+\code{hwsd_extract()} will synthesize results using those rules (equivalent to
+\code{hwsd_compose()}). If a \code{precision} column is present, it will be used to
+round numeric outputs.}
+
+\item{output}{Output shape for point queries: \code{"wide"} or \code{"long"}.}
 }
 \value{
-tibble for point queries; \code{terra::SpatRaster} (or file path if \code{internal=FALSE}) for bbox queries.
+Tibble with columns \code{lon}, \code{lat}, and one column per requested parameter
+(wide) or long table for point queries; \code{terra::SpatRaster} (or file path if
+\code{internal=FALSE}) for bbox queries.
 }
 \description{
-Extract HWSD v2.0 attributes (point or bbox)
+Extract HWSD v2.0 attributes (dominant component)
+}
+\details{
+Dominant component selection follows: prefer SEQUENCE = 1 if present; within
+SEQUENCE = 1 choose the largest SHARE; if no SEQUENCE = 1 exists, choose the
+largest SHARE (ties break by smallest SEQUENCE when available).
+For share-weighted synthesis, use \code{hwsd_compose()}.
+}
+\examples{
+\dontrun{
+# Dominant component (default behavior)
+pt <- hwsd_extract(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "D:/data/HWSD2"
+)
+
+# Share-weighted synthesis using default rules
+props <- hwsd_props()
+pt_syn <- hwsd_compose(
+  coords = c(110, 40),
+  param = c("SAND", "PH_WATER"),
+  layer = "D1",
+  ws_path = "D:/data/HWSD2",
+  props = props
+)
+}
 }

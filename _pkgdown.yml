@@ -1,0 +1,21 @@
+site: tidyhwsd
+url: https://rimagination.github.io/tidyhwsd
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left:  [home, reference, articles]
+    right: [github]
+
+reference:
+  - title: Core
+    contents:
+      - hwsd_extract
+      - hwsd_compose
+      - hwsd_props
+      - hwsd_download
+  - title: Data
+    contents:
+      - hwsd2_layers

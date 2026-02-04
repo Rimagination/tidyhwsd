@@ -2,7 +2,7 @@
 .tidyhwsd_cache <- new.env(parent = emptyenv())
 
 # avoid CMD check notes on NSE columns
-utils::globalVariables(c("LAYER", "HWSD2_SMU_ID"))
+utils::globalVariables(c("LAYER", "HWSD2_SMU_ID", "SEQUENCE", "SHARE"))
 
 # HWSD v2.0 endpoints
 server <- function() {

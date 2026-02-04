@@ -15,7 +15,6 @@ hwsd_extract(
   tiles_deg = Inf,
   cores = 1,
   verbose = FALSE,
-  props = NULL,
   output = "wide"
 )
 }
@@ -42,11 +41,6 @@ smaller than extent, tiles are processed and mosaicked.}
 \item{cores}{Number of cores for tiling (uses \code{parallel::mclapply} on non-Windows).}
 
 \item{verbose}{Show progress messages.}
-
-\item{props}{Optional aggregation spec (from \code{hwsd_props()}). If provided,
-\code{hwsd_extract()} will synthesize results using those rules (equivalent to
-\code{hwsd_compose()}). If a \code{precision} column is present, it will be used to
-round numeric outputs.}
 
 \item{output}{Output shape for point queries: \code{"wide"} or \code{"long"}.}
 }

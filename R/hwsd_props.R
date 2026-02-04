@@ -3,7 +3,7 @@
 #' Returns a tibble of property names present in the bundled \code{hwsd2_layers}
 #' component table, with type info, descriptions, default aggregation rules, and
 #' rounding precision. The \code{agg} and \code{precision} columns are meant to be
-#' edited and passed into \code{hwsd_compose()} or \code{hwsd_extract(props = ...)}.
+#' edited and passed into \code{hwsd_compose()}.
 #'
 #' @return tibble with columns \code{property}, \code{type}, \code{description},
 #'   \code{agg} (default aggregation method), and \code{precision} (rounding step).

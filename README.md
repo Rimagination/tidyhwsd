@@ -29,7 +29,7 @@ pt <- hwsd_extract(
   ws_path = "D:/data/HWSD2"
 )
 
-# Share-weighted synthesis
+# Share-weighted synthesis (use hwsd_compose)
 props <- hwsd_props()
 pt_syn <- hwsd_compose(
   coords = c(110, 40),

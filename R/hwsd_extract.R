@@ -13,10 +13,6 @@
 #'   smaller than extent, tiles are processed and mosaicked.
 #' @param cores Number of cores for tiling (uses `parallel::mclapply` on non-Windows).
 #' @param verbose Show progress messages.
-#' @param props Optional aggregation spec (from `hwsd_props()`). If provided,
-#'   `hwsd_extract()` will synthesize results using those rules (equivalent to
-#'   `hwsd_compose()`). If a `precision` column is present, it will be used to
-#'   round numeric outputs.
 #' @param output Output shape for point queries: `"wide"` or `"long"`.
 #' @return Tibble with columns `lon`, `lat`, and one column per requested parameter
 #'   (wide) or long table for point queries; `terra::SpatRaster` (or file path if
@@ -59,27 +55,9 @@ hwsd_extract <- function(
   tiles_deg = Inf,
   cores = 1,
   verbose = FALSE,
-  props = NULL,
   output = "wide"
 ) {
   output <- match.arg(output, c("wide", "long"))
-
-  if (!is.null(props)) {
-    return(hwsd_compose(
-      coords = coords,
-      bbox = bbox,
-      param = param,
-      layer = layer,
-      path = path,
-      ws_path = ws_path,
-      internal = internal,
-      tiles_deg = tiles_deg,
-      cores = cores,
-      verbose = verbose,
-      props = props,
-      output = output
-    ))
-  }
 
   .hwsd_extract_impl(
     coords = coords,

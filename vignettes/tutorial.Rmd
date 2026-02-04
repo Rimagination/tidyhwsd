@@ -184,21 +184,6 @@ pt_named <- hwsd_compose(
 )
 ```
 
-`hwsd_extract(props = ...)` is equivalent to `hwsd_compose()` and can be used to keep a single
-entry point:
-
-```{r}
-props <- hwsd_props()
-props$agg[props$property == "PH_WATER"] <- "dominant"
-pt_syn2 <- hwsd_extract(
-  coords = c(110, 40),
-  param = c("SAND", "PH_WATER"),
-  layer = "D1",
-  ws_path = "~/data/HWSD2",
-  props = props
-)
-```
-
 ## Bounding box queries (SpatRaster)
 
 For large areas, enable tiling to improve performance:

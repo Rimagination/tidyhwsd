@@ -53,7 +53,7 @@ pt <- hwsd_extract(
 
 ## Share-weighted synthesis
 
-Use `hwsd_compose()` to synthesize values across components:
+Use `hwsd_compose()` to synthesize values across components (dominant-only extraction is via `hwsd_extract()`):
 
 ```{r}
 props <- hwsd_props()

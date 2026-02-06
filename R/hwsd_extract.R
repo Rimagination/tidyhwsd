@@ -95,7 +95,8 @@ hwsd_extract <- function(
   dominant_by = "seq1_then_share",
   normalize_share = TRUE,
   share_tol = 1,
-  output = "wide"
+  output = "wide",
+  cat_levels_map = NULL
 ) {
 
   # handle input modes
@@ -197,6 +198,45 @@ hwsd_extract <- function(
   needed_cols <- unique(c("HWSD2_SMU_ID", "LAYER", "SEQUENCE", "SHARE", param))
   needed_cols <- intersect(available, needed_cols)
 
+  categorical_cols <- character(0)
+  if (!is.null(agg_spec) && length(agg_spec) > 0) {
+    categorical_cols <- names(agg_spec)[agg_spec == "weighted_mode"]
+  }
+  non_numeric_cols <- names(hwsd2_layers)[
+    !vapply(hwsd2_layers, is.numeric, logical(1))
+  ]
+  categorical_cols <- unique(c(
+    intersect(param, non_numeric_cols),
+    intersect(param, categorical_cols)
+  ))
+
+  if (is.null(cat_levels_map)) {
+    cat_levels_map <- list()
+    if (length(categorical_cols) > 0) {
+      for (col in categorical_cols) {
+        x <- hwsd2_layers[[col]]
+        if (is.factor(x)) {
+          x <- as.character(x)
+        }
+        if (is.numeric(x) || is.integer(x)) {
+          vals <- sort(unique(x))
+          vals <- vals[is.finite(vals)]
+          vals <- vals[!is.na(vals)]
+          cats <- as.character(vals)
+        } else {
+          cats <- unique(as.character(x))
+          cats <- cats[!is.na(cats)]
+        }
+        cat_levels_map[[col]] <- data.frame(
+          ID = seq_along(cats),
+          label = cats,
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        )
+      }
+    }
+  }
+
   collapse_fun <- if (is.null(agg_spec)) {
     function(df) collapse_group_dominant(df, dominant_by = dominant_by)
   } else {
@@ -265,7 +305,9 @@ hwsd_extract <- function(
         dominant_by = dominant_by,
         normalize_share = normalize_share,
         share_tol = share_tol,
-        output = "wide"
+        output = "wide",
+        precision = precision,
+        cat_levels_map = cat_levels_map
       )
     }
 
@@ -278,10 +320,13 @@ hwsd_extract <- function(
     mosaic <- do.call(terra::mosaic, rasters)
     names(mosaic) <- param
 
-    # Restore factor levels from the first tile (encoding is global)
-    if (length(rasters) > 0) {
-      r1 <- rasters[[1]]
-      levels(mosaic) <- terra::levels(r1)
+    # Restore factor levels using global category map (stable across tiles)
+    if (length(param) > 0 && !is.null(cat_levels_map)) {
+      for (j in seq_along(param)) {
+        if (!is.null(cat_levels_map[[param[j]]])) {
+          levels(mosaic[[j]]) <- cat_levels_map[[param[j]]]
+        }
+      }
     }
 
     if (internal) {
@@ -384,15 +429,23 @@ hwsd_extract <- function(
   for (j in seq_along(param)) {
     column <- agg[[param[j]]]
 
-    if (is.numeric(column)) {
+    if (!is.null(cat_levels_map[[param[j]]])) {
+      cats <- cat_levels_map[[param[j]]]
+      ids <- match(as.character(column), cats$label)
+      lookup <- stats::setNames(ids, agg$HWSD2_SMU_ID)
+      param_mat[, j] <- lookup[as.character(ids_vec)]
+      levels_list[[j]] <- cats
+    } else if (is.numeric(column)) {
       column[column < 0] <- NA
       lookup <- stats::setNames(column, agg$HWSD2_SMU_ID)
       param_mat[, j] <- lookup[as.character(ids_vec)]
     } else {
       f_col <- factor(column)
       levels_list[[j]] <- data.frame(
-        id = seq_along(levels(f_col)),
-        category = levels(f_col)
+        ID = seq_along(levels(f_col)),
+        label = levels(f_col),
+        stringsAsFactors = FALSE,
+        check.names = FALSE
       )
       vals <- as.integer(f_col)
       lookup <- stats::setNames(vals, agg$HWSD2_SMU_ID)

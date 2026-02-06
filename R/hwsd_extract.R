@@ -213,10 +213,20 @@ hwsd_extract <- function(
   if (is.null(cat_levels_map)) {
     cat_levels_map <- list()
     if (length(categorical_cols) > 0) {
+      meta_maps <- .hwsd_meta_maps()
       for (col in categorical_cols) {
         x <- hwsd2_layers[[col]]
         if (is.factor(x)) {
           x <- as.character(x)
+        }
+        if (identical(col, "DRAINAGE")) {
+          cat_levels_map[[col]] <- .hwsd_drainage_levels(x)
+          next
+        }
+        meta_key <- .hwsd_meta_key(col)
+        if (!is.null(meta_key) && !is.null(meta_maps[[meta_key]])) {
+          cat_levels_map[[col]] <- .hwsd_levels_from_meta(meta_maps[[meta_key]], x)
+          next
         }
         if (is.numeric(x) || is.integer(x)) {
           vals <- sort(unique(x))
@@ -431,7 +441,12 @@ hwsd_extract <- function(
 
     if (!is.null(cat_levels_map[[param[j]]])) {
       cats <- cat_levels_map[[param[j]]]
-      ids <- match(as.character(column), cats$label)
+      key_col <- if ("code" %in% names(cats)) "code" else "label"
+      col_vals <- as.character(column)
+      if (key_col == "code") {
+        col_vals <- .hwsd_normalize_codes(col_vals)
+      }
+      ids <- match(col_vals, as.character(cats[[key_col]]))
       lookup <- stats::setNames(ids, agg$HWSD2_SMU_ID)
       param_mat[, j] <- lookup[as.character(ids_vec)]
       levels_list[[j]] <- cats
